@@ -9,8 +9,8 @@ elf = ELF("./vuln")
 libc = ELF("./libc.so.6")
 
 # Alvo remoto do picoCTF
-HOST = "wily-courier.picoctf.net"
-PORT = 60182
+HOST = "chatelaine.cylabacademy.net"
+PORT = 22586
 
 # Offset até RIP:
 # buffer começa em rbp-0x80 = 128 bytes

