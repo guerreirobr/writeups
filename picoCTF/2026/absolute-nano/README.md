@@ -106,7 +106,7 @@ ls
 flag.txt
 ```
 
-Mas o meu usuário não pode lê-la:
+**Isso não funcionou** (pule ao replicar): o meu usuário não pode lê-la.
 
 ***INSERIR no terminal — shell no alvo como ctf-player
 
@@ -118,7 +118,7 @@ cat flag.txt
 cat: flag.txt: Permission denied
 ```
 
-O enunciado fala em "complete power with nano", então testei o óbvio: abrir a flag no Nano.
+**Isso também não funcionou** (pule ao replicar): o enunciado fala em "complete power with nano", então testei o óbvio, abrir a flag no Nano.
 
 ***INSERIR no terminal — shell no alvo como ctf-player
 
@@ -217,38 +217,6 @@ Logo depois a instância encerrou a conexão (`Connection to crystal-peak.picoct
 ## Por que funciona
 
 O Nano não tem vulnerabilidade nenhuma: ele só fez o que um editor faz, com o privilégio que o sudo lhe deu. A falha é de **configuração**. A regra delega a um usuário comum uma escrita privilegiada justamente sobre o arquivo que define a fronteira de privilégio. Restringir o *binário* e o *argumento* não ajuda quando o argumento é a própria política: a primitiva obtida ("escrever `/etc/sudoers` como root") é equivalente a root. Classe: CWE-269 (*Improper Privilege Management*) / MITRE ATT&CK T1548.003 (*Sudo and Sudo Caching*).
-
-## Reprodução mínima
-
-Partindo de uma nova instância (com os valores dela em `TARGET_HOST`/`TARGET_PORT`):
-
-***INSERIR no terminal — Kali (atacante)
-
-```bash
-ssh -p $TARGET_PORT ctf-player@$TARGET_HOST
-```
-
-***INSERIR no terminal — shell no alvo como ctf-player
-
-```bash
-sudo -l
-```
-
-Checkpoint: a saída deve conter `(ALL) NOPASSWD: /bin/nano /etc/sudoers`.
-
-```bash
-sudo /bin/nano /etc/sudoers
-```
-
-No editor, troque `NOPASSWD: /bin/nano /etc/sudoers` por `NOPASSWD: ALL` na linha do `ctf-player` e salve (`Ctrl+O`, `Enter`, `Ctrl+X`).
-
-```bash
-sudo cat /home/ctf-player/flag.txt
-```
-
-Checkpoint: a flag `picoCTF{...}` é impressa.
-
-Nenhum script é necessário: a solução é uma edição interativa e um `cat`.
 
 ## Além da flag
 
