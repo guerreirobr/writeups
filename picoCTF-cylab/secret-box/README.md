@@ -5,10 +5,11 @@
 | | |
 |---|---|
 | **Plataforma / evento** | picoCTF 2026 |
+| **Plataforma (hoje)** | CyLab Academy (`cylabacademy.net`) |
 | **Categoria** | Web Exploitation |
 | **Dificuldade / pontos** | Medium |
 | **Autor do desafio** | Janice He |
-| **Resolvido em** | 2026-05-18 |
+| **Resolvido / revalidado em** | 2026-11-02 |
 
 ## TL;DR
 
@@ -37,12 +38,12 @@ A app guarda "segredos" por usuário. Quase todas as queries usam parâmetros pr
 
 - **Máquina atacante:** Kali Linux, com `curl`.
 
-Na minha instância o alvo estava em `candy-mountain.picoctf.net:58223`. Use o da sua.
+Na minha instância o alvo estava em `xebec.cylabacademy.net:20352`. Use o da sua.
 
 ***INSERIR no terminal: Kali (atacante)
 
 ```bash
-export BASE=http://candy-mountain.picoctf.net:58223
+export BASE=http://xebec.cylabacademy.net:20352
 ```
 
 ## Resolução
@@ -136,11 +137,11 @@ Agora leio meus segredos e filtro a flag:
 ***INSERIR no terminal: Kali (atacante)
 
 ```bash
-curl -s -b cookies.txt "$BASE/" | grep -oE 'picoCTF\{[^}]+\}'
+curl -s -b cookies.txt "$BASE/" | grep -oE 'academy\{[^}]+\}'
 ```
 
 ```text
-picoCTF{sq1_1nject10n_831311dc}
+academy{sq1_1nject10n_ceeXXXXX}
 ```
 
 ## Cadeia de ataque
@@ -177,5 +178,5 @@ A suposição de segurança quebrada é o isolamento entre usuários: cada um s�
 ## Flag
 
 ```text
-picoCTF{sq1_1nject10n_831311dc}
+academy{sq1_1nject10n_ceeXXXXX}
 ```
