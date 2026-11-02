@@ -110,12 +110,12 @@ O `||` é a concatenação do PostgreSQL. O `content` inserido passa a ser `'' +
 
 ### 3. Explorando
 
-Crio um usuário, logo (guardando o cookie `auth_token`), disparo o INSERT malicioso e leio a página inicial.
+Crio um usuário qualquer (o nome é só uma conta descartável do atacante; o `$(date +%s)` garante que seja único e não colida no signup), logo (guardando o cookie `auth_token`), disparo o INSERT malicioso e leio a página inicial.
 
 ***INSERIR no terminal: Kali (atacante)
 
 ```bash
-export USER=victor$(date +%s) PASS=123456
+export USER=atacante$(date +%s) PASS=123456
 ```
 
 ```bash
