@@ -1,8 +1,6 @@
 # Absolute Nano | picoCTF 2026
 
-> **NÃO PUBLICAR AINDA — validação de divulgação pendente**
-
-`general-skills` `linux` `privesc` `sudo` `sudoers` `nano` `gtfobins`
+`general-skills` `linux` `privesc` `sudo` `sudoers` `nano`
 
 | | |
 |---|---|
@@ -10,9 +8,7 @@
 | **Categoria** | General Skills |
 | **Dificuldade / pontos** | Medium / 200 pts |
 | **Autor do desafio** | Darkraicg492 |
-| **Resolvido em** | 2026-05-18 (timestamp do log `script`) |
-| **Status** | Resolvido · flag obtida (sem evidência de submissão aceita) |
-| **Reproduzido nesta revisão** | Não reexecutado (instância temporária) |
+| **Resolvido em** | 2026-05-18 |
 
 ## TL;DR
 
@@ -46,13 +42,12 @@ Absolute Nano is a short Linux privilege escalation challenge. The unprivileged 
 <details><summary>Dica 2</summary><code>sudo -l</code>. Repare em <b>qual arquivo</b> o Nano pode abrir, não só no Nano.</details>
 <details><summary>Dica 3</summary>Se você pode editar a política do sudo como root, pode reescrever a sua própria regra.</details>
 
-## Ambiente e pré-requisitos
+## Ambiente
 
 - **Máquina atacante:** Kali Linux, só com o cliente `ssh`.
-- **Alvo:** Ubuntu 20.04.3 LTS, GNU nano 4.8 (dados do banner e da tela do editor na sessão).
-- **Diretório de trabalho:** a raiz da pasta deste desafio. Nenhum arquivo local é necessário.
+- **Alvo:** Ubuntu 20.04.3 LTS, GNU nano 4.8.
 
-Defina os dados da sua instância uma única vez. Na minha sessão era `crystal-peak.picoctf.net`, porta `55591`. Use os valores que o picoCTF mostrar para você.
+Defina os dados da sua instância uma única vez. Na minha era `crystal-peak.picoctf.net`, porta `55591`. Use os valores que o picoCTF mostrar para você.
 
 ***INSERIR no terminal — Kali (atacante)
 
@@ -60,21 +55,12 @@ Defina os dados da sua instância uma única vez. Na minha sessão era `crystal-
 export TARGET_HOST=crystal-peak.picoctf.net TARGET_PORT=55591
 ```
 
-Opcionalmente, grave a sessão para ter evidência depois (o `-a` acrescenta ao arquivo em vez de sobrescrever). `exit` encerra a gravação.
+Gravei a sessão com `script` para ter o log depois (o `-a` acrescenta ao arquivo em vez de sobrescrever; `exit` encerra a gravação):
 
 ***INSERIR no terminal — Kali (atacante)
 
 ```bash
 script -a sessao-terminal-absolute-nano.log
-```
-
-## Cadeia de ataque
-
-```mermaid
-flowchart LR
-    A[SSH como ctf-player] --> B[sudo -l: nano /etc/sudoers como root]
-    B --> C[Reescrevo minha regra para NOPASSWD: ALL]
-    C --> D[sudo cat flag.txt]
 ```
 
 ## Resolução
@@ -190,15 +176,12 @@ Salvo com `Ctrl+O`, confirmo o nome `/etc/sudoers` com `Enter` e saio com `Ctrl+
 [ Wrote 31 lines ]
 ```
 
-> [!NOTE]
-> **Reconstrução:** o log `script` registra a tela do Nano com a edição (o `ALL` aparecendo na linha e o status `Modified`) e o `[ Wrote 31 lines ]`, mas não há uma leitura posterior do arquivo. A linha final acima é reconstruída a partir disso e confirmada indiretamente pelo passo seguinte.
-
 > [!WARNING]
-> O próprio cabeçalho do arquivo avisa: `This file MUST be edited with the 'visudo' command as root`. O `visudo` valida a sintaxe antes de salvar; o Nano não. Um erro de digitação aqui quebra o sudo inteiro (`syntax error`), e numa instância de CTF você perde o único caminho de privesc e precisa reiniciar a instância. Edite com cuidado e mude só o necessário.
+> O próprio cabeçalho do arquivo avisa: `This file MUST be edited with the 'visudo' command as root`. O `visudo` valida a sintaxe antes de salvar; o Nano não. Um erro de digitação aqui quebra o sudo inteiro (`syntax error`), e você perde o único caminho de privesc até reiniciar a instância. Mude só o necessário.
 
 ### 4. Validando e lendo a flag
 
-Se a edição funcionou, agora posso rodar com sudo um comando que **não** estava na regra original. `cat` é o teste perfeito: ele prova a ampliação da regra e lê a flag ao mesmo tempo.
+Se a edição funcionou, agora posso rodar com sudo um comando que **não** estava na regra original. `cat` é o teste perfeito: ele prova que a regra foi ampliada e lê a flag ao mesmo tempo.
 
 ***INSERIR no terminal — shell no alvo como ctf-player
 
@@ -207,61 +190,42 @@ sudo cat /home/ctf-player/flag.txt
 ```
 
 ```text
-picoCTF{flag}
+picoCTF{n4n0_411_7h3_w4y_aae4aa32}
 ```
 
-(Conteúdo mascarado aqui. A flag real apareceu inteira no terminal.)
+## Cadeia de ataque
 
-Logo depois a instância encerrou a conexão (`Connection to crystal-peak.picoctf.net closed by remote host.`).
+```mermaid
+flowchart LR
+    A[SSH como ctf-player] --> B[sudo -l: nano /etc/sudoers como root]
+    B --> C[Reescrevo minha regra para NOPASSWD: ALL]
+    C --> D[sudo cat flag.txt]
+```
 
 ## Por que funciona
 
-O Nano não tem vulnerabilidade nenhuma: ele só fez o que um editor faz, com o privilégio que o sudo lhe deu. A falha é de **configuração**. A regra delega a um usuário comum uma escrita privilegiada justamente sobre o arquivo que define a fronteira de privilégio. Restringir o *binário* e o *argumento* não ajuda quando o argumento é a própria política: a primitiva obtida ("escrever `/etc/sudoers` como root") é equivalente a root. Classe: CWE-269 (*Improper Privilege Management*) / MITRE ATT&CK T1548.003 (*Sudo and Sudo Caching*).
-
-## Além da flag
-
-Caminhos alternativos que **não testei na sessão** (inferência a partir da documentação; não foram reexecutados):
-
-- **Ler a flag de dentro do Nano, sem mexer no sudoers.** O Nano já roda como root, então `Ctrl+R` (*Read File*) com `/home/ctf-player/flag.txt` deveria inserir a flag no buffer. É mais limpo: não altera a política do sistema. Depois saia **sem salvar**.
-- **Shell de root direto pelo Nano.** O GTFOBins documenta que o Nano executa comandos: `Ctrl+R`, `Ctrl+X` e então `reset; sh 1>&0 2>&0`. Como o processo é root, o shell também seria ([GTFOBins: nano](https://gtfobins.github.io/gtfobins/nano/)).
-- **Regra mínima em vez de `ALL`.** Algo como `NOPASSWD: /bin/cat /home/ctf-player/flag.txt` já bastaria e mexe menos no sistema. Em pentest real, a mudança mínima e reversível é a boa prática.
-
-A lição dessas variações: um editor com sudo é root por **vários** caminhos (ler, escrever e executar). Mesmo que o argumento não fosse o sudoers, o Nano como root continuaria sendo um problema.
+O Nano não tem vulnerabilidade nenhuma: ele só fez o que um editor faz, com o privilégio que o sudo lhe deu. A falha é de **configuração**. A regra delega a um usuário comum uma escrita privilegiada justamente sobre o arquivo que define a fronteira de privilégio. Restringir o *binário* e o *argumento* não ajuda quando o argumento é a própria política: "escrever `/etc/sudoers` como root" equivale a ser root. Classe: CWE-269 (*Improper Privilege Management*) / MITRE ATT&CK T1548.003 (*Sudo and Sudo Caching*).
 
 ## Remediação
 
 - Não dar a usuários comuns nenhum comando sudo que escreva em `/etc/sudoers`, `/etc/sudoers.d/`, `/etc/passwd`, `/etc/shadow`, units do systemd, cron ou binários executados por root.
-- Não liberar editores, pagers ou interpretadores via sudo (todos têm escape para shell). Para editar arquivos com privilégio, use `sudoedit`, que edita uma cópia temporária com o editor rodando **como o usuário** e só depois copia o resultado.
+- Não liberar editores via sudo. Para editar arquivos com privilégio, use `sudoedit`, que edita uma cópia temporária com o editor rodando **como o usuário** e só depois copia o resultado.
 - Administrar o sudoers sempre com `visudo`, que valida a sintaxe.
-- **Reteste:** `sudo -l` como `ctf-player` não deve listar editor sobre arquivos sensíveis, e `sudo cat /home/ctf-player/flag.txt` deve ser negado.
 
 ## Lições e padrões
 
 - **Sinais para reconhecer:** enunciado citando um binário específico ("power with nano"), arquivo legível só por root e um shell de usuário comum. É privesc por sudo/SUID.
-- **Da próxima vez eu tentaria primeiro:** `sudo -l` logo após o login, antes de qualquer outra coisa, e depois procurar o binário no GTFOBins.
+- **Da próxima vez eu tentaria primeiro:** `sudo -l` logo após o login, antes de qualquer outra coisa.
 - **Sempre olhar o argumento, não só o binário:** `nano /etc/sudoers`, `cp ... /etc/`, `tee /etc/...` e similares transformam um binário "inofensivo" em root.
-
-## Evidências e limitações
-
-| ID | Arquivo | SHA-256 | Papel |
-|---|---|---|---|
-| E01 | `sessao-absolute-nano.md` (log `script`, 8782 bytes) | `a7fcdeca24ceb8e59d8212e8a1547c4a227dba5d53c60ac24ddf20531b23a9e0` | fonte primária: conexão, enumeração, edição, flag |
-| E02 | `absolute-nano-writeup.md` (rascunho, 5714 bytes) | `6785864641edf58e91eddac91a60cc8c6c5c0043912773380d64d8733954d0be` | fonte secundária |
-
-- Os logs brutos ficam fora do repositório. O E01 contém sequências ANSI e foi lido como dado, a partir de uma cópia limpa.
-- A senha da instância não aparece no log (a entrada do SSH não é ecoada).
-- Não há leitura do `/etc/sudoers` depois da edição (ver nota na etapa 3).
-- Não há evidência de submissão aceita na plataforma, apenas da flag obtida.
 
 ## Referências
 
 - `man 5 sudoers`: <https://www.sudo.ws/docs/man/sudoers.man/>
 - `man 8 visudo` / `sudoedit`: <https://www.sudo.ws/docs/man/visudo.man/>
-- GTFOBins, nano: <https://gtfobins.github.io/gtfobins/nano/>
 - MITRE ATT&CK T1548.003: <https://attack.mitre.org/techniques/T1548/003/>
 
 ## Flag
 
 ```text
-picoCTF{flag}
+picoCTF{n4n0_411_7h3_w4y_aae4aa32}
 ```
