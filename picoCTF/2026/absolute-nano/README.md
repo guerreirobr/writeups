@@ -8,7 +8,8 @@
 | **Categoria** | General Skills |
 | **Dificuldade / pontos** | Medium / 200 pts |
 | **Autor do desafio** | Darkraicg492 |
-| **Resolvido em** | 2026-05-18 |
+| **Plataforma (hoje)** | CyLab Academy (`cylabacademy.net`) |
+| **Resolvido / revalidado em** | 2026-11-02 |
 
 ## TL;DR
 
@@ -45,14 +46,14 @@ Absolute Nano is a short Linux privilege escalation challenge. The unprivileged 
 ## Ambiente
 
 - **Máquina atacante:** Kali Linux, só com o cliente `ssh`.
-- **Alvo:** Ubuntu 20.04.3 LTS, GNU nano 4.8.
+- **Alvo:** Ubuntu 24.04.1 LTS (container), GNU nano 7.2.
 
-Defina os dados da sua instância uma única vez. Na minha era `crystal-peak.picoctf.net`, porta `55591`. Use os valores que o picoCTF mostrar para você.
+Defina os dados da sua instância uma única vez. Na minha era `chatelaine.cylabacademy.net`, porta `28581`. Use os valores que a plataforma mostrar para você (mudam a cada instância).
 
 ***INSERIR no terminal — Kali (atacante)
 
 ```bash
-export TARGET_HOST=crystal-peak.picoctf.net TARGET_PORT=55591
+export TARGET_HOST=chatelaine.cylabacademy.net TARGET_PORT=28581
 ```
 
 Gravei a sessão com `script` para ter o log depois (o `-a` acrescenta ao arquivo em vez de sobrescrever; `exit` encerra a gravação):
@@ -76,7 +77,7 @@ ssh -p $TARGET_PORT ctf-player@$TARGET_HOST
 ```
 
 ```text
-Welcome to Ubuntu 20.04.3 LTS (GNU/Linux 6.17.0-1013-aws x86_64)
+Welcome to Ubuntu 24.04.1 LTS (GNU/Linux 7.0.0-1014-aws x86_64)
 ...[snip]...
 ```
 
@@ -131,7 +132,8 @@ sudo -l
 ```text
 Matching Defaults entries for ctf-player on challenge:
     env_reset, mail_badpass,
-    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin,
+    use_pty
 
 User ctf-player may run the following commands on challenge:
     (ALL) NOPASSWD: /bin/nano /etc/sudoers
@@ -190,7 +192,7 @@ sudo cat /home/ctf-player/flag.txt
 ```
 
 ```text
-picoCTF{n4n0_411_7h3_w4y_aae4aa32}
+academy{n4n0_411_7h3_w4y_3ddXXXXX}
 ```
 
 ## Cadeia de ataque
@@ -227,5 +229,5 @@ O Nano não tem vulnerabilidade nenhuma: ele só fez o que um editor faz, com o 
 ## Flag
 
 ```text
-picoCTF{n4n0_411_7h3_w4y_aae4aa32}
+academy{n4n0_411_7h3_w4y_3ddXXXXX}
 ```
