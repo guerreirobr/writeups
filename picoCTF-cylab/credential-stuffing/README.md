@@ -19,13 +19,13 @@ O desafio dá um dump de 1500 pares `usuario;senha` vazados e um serviço de log
 > **Ideia-chave:** credential stuffing explora **reúso de senha**. Credenciais vazadas em um lugar funcionam em outro quando a pessoa repete a mesma senha. O ataque é só automação: testar o dump inteiro contra o alvo.
 
 > [!WARNING]
-> O par válido **e o sufixo da flag mudam a cada instância** (o serviço sorteia qual credencial do dump é válida). Na minha validação de 2026-11-02 o par vencedor foi `ehi:smack`; na sua pode ser outro. O dump (os 1500 usuários) é o mesmo — o método não muda.
+> O par válido **e o sufixo da flag mudam a cada instância** (o serviço sorteia qual credencial do dump é válida). Na minha validação de 2026-11-02 o par vencedor foi `ehi:smack`; na sua pode ser outro. O dump (os 1500 usuários) é o mesmo, o método não muda.
 
 ## Enunciado
 
 > Credential stuffing is the automated injection of stolen username and password pairs ("credentials") in to website login forms, in order to fraudulently gain access to user accounts. (...) submitting those sets of stolen credentials into dozens or hundreds of other sites can allow an attacker to compromise those accounts too. Download the credentials dump here.
 
-**Arquivos:** [`files/creds-dump.txt`](files/creds-dump.txt) — 1500 pares `usuario;senha`. **Instância:** serviço de login por socket (host e porta gerados pela plataforma).
+**Arquivos:** [`files/creds-dump.txt`](files/creds-dump.txt), 1500 pares `usuario;senha`. **Instância:** serviço de login por socket (host e porta gerados pela plataforma).
 
 ## Dicas progressivas
 
@@ -35,12 +35,12 @@ O desafio dá um dump de 1500 pares `usuario;senha` vazados e um serviço de log
 
 ## Ambiente
 
-- **Máquina atacante:** Kali Linux, com `python3` (só a stdlib — `socket` + `concurrent.futures`).
+- **Máquina atacante:** Kali Linux, com `python3` (só a stdlib, `socket` + `concurrent.futures`).
 - **Arquivo:** `files/creds-dump.txt` na raiz da pasta do desafio.
 
 Na minha instância o serviço estava em `xebec.cylabacademy.net:10001`. Use o da sua.
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 export TARGET_HOST=xebec.cylabacademy.net TARGET_PORT=10001
@@ -52,7 +52,7 @@ export TARGET_HOST=xebec.cylabacademy.net TARGET_PORT=10001
 
 Conectando manualmente, o serviço é um banco online que pede `Username:` e, em seguida, `Password:`. Com credenciais válidas responde `Welcome <user>!` e imprime a flag; com inválidas, responde `Invalid username or password` e **fecha a conexão** (uma tentativa por conexão). O formato do dump é `usuario;senha`, uma por linha.
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 nc $TARGET_HOST $TARGET_PORT
@@ -68,13 +68,13 @@ Invalid username or password
 ```
 
 > [!TIP]
-> **Conceito: credential stuffing.** Diferente de brute force (que adivinha senhas), aqui testamos pares reais vazados, apostando que a vítima reusou a mesma senha neste serviço. A taxa de sucesso é baixa por par, mas alta no agregado quando há reúso. Referência: [OWASP — Credential Stuffing](https://owasp.org/www-community/attacks/Credential_stuffing).
+> **Conceito: credential stuffing.** Diferente de brute force (que adivinha senhas), aqui testamos pares reais vazados, apostando que a vítima reusou a mesma senha neste serviço. A taxa de sucesso é baixa por par, mas alta no agregado quando há reúso. Referência: [OWASP: Credential Stuffing](https://owasp.org/www-community/attacks/Credential_stuffing).
 
 ### 2. Calibrando a concorrência
 
 São 1500 pares. A primeira ideia é paralelizar bastante, mas **isso não funciona aqui**:
 
-> **Isso não funcionou (pule ao replicar):** com 25-30 workers, **todas** as conexões voltam com erro (`err=200/200` num lote de teste) — o serviço recusa conexões simultâneas em excesso.
+> **Isso não funcionou (pule ao replicar):** com 25-30 workers, **todas** as conexões voltam com erro (`err=200/200` num lote de teste), o serviço recusa conexões simultâneas em excesso.
 
 Medindo em lotes pequenos, o serviço tolera **3-4 conexões ao mesmo tempo**. Com `WORKERS=4` e mandando usuário e senha na mesma escrita (o serviço lê as duas linhas em sequência, então não preciso esperar cada prompt), a vazão fica em ~12 pares/s e as respostas voltam limpas (`Invalid` nas erradas). O dump inteiro roda em ~1-2 min.
 
@@ -84,6 +84,15 @@ O [`scripts/script1.py`](scripts/script1.py) abre uma conexão por par (4 em par
 
 ```python
 #!/usr/bin/env python3
+# Credential stuffing contra o serviço de login por socket.
+#
+# Calibração importante: o serviço aceita só ~3-4 conexões simultâneas; com mais
+# que isso TODAS as conexões são recusadas (erro). Por isso WORKERS=4. Também
+# mando usuário e senha na mesma escrita (o serviço lê duas linhas em sequência),
+# cortando round-trips. Para na primeira resposta que NÃO contém "Invalid".
+#
+# Uso: TARGET_HOST=host TARGET_PORT=porta python3 scripts/script1.py
+
 import socket, os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -136,12 +145,13 @@ def main():
                 print(f"\n[+] par válido: {r[0]}:{r[1]}")
                 print(r[2])
                 return
+    print("[-] nenhum par válido encontrado (dump não corresponde a esta instância?)")
 
 if __name__ == "__main__":
     main()
 ```
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 python3 scripts/script1.py
@@ -173,21 +183,21 @@ O serviço aceita login por um par válido qualquer do banco. Como o dump conté
 
 ## Remediação
 
-- Rate limiting e bloqueio progressivo por IP/conta após tentativas falhas (o limite de conexões aqui era fraco demais — só exigiu baixar workers).
+- Rate limiting e bloqueio progressivo por IP/conta após tentativas falhas (o limite de conexões aqui era fraco demais, só exigiu baixar workers).
 - MFA, que quebra o ataque mesmo com a senha correta.
 - Monitorar e barrar logins automatizados (device fingerprinting, CAPTCHA em comportamento suspeito).
 - Do lado do usuário: senhas únicas por serviço e gerenciador de senhas.
 
 ## Lições e padrões
 
-- **Sinais para reconhecer:** sempre que um desafio entrega uma lista de credenciais e um login, é credential stuffing — o trabalho é de automação e estabilidade, não de técnica.
-- **Da próxima vez eu tentaria primeiro:** calibrar a concorrência num lote pequeno antes de disparar as 1500 — aqui 30 workers davam 100% de erro e 4 workers resolviam.
+- **Sinais para reconhecer:** sempre que um desafio entrega uma lista de credenciais e um login, é credential stuffing, o trabalho é de automação e estabilidade, não de técnica.
+- **Da próxima vez eu tentaria primeiro:** calibrar a concorrência num lote pequeno antes de disparar as 1500, aqui 30 workers davam 100% de erro e 4 workers resolviam.
 - **Onde perdi tempo:** assumir que mais workers = mais rápido. O gargalo era o limite de conexões do serviço, não a minha máquina.
 
 ## Referências
 
-- [OWASP — Credential Stuffing](https://owasp.org/www-community/attacks/Credential_stuffing)
-- [Python — `socket` / `concurrent.futures`](https://docs.python.org/3/library/concurrent.futures.html)
+- [OWASP: Credential Stuffing](https://owasp.org/www-community/attacks/Credential_stuffing)
+- [Python: `socket` / `concurrent.futures`](https://docs.python.org/3/library/concurrent.futures.html)
 
 ## Flag
 

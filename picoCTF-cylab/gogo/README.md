@@ -12,10 +12,10 @@
 
 ## TL;DR
 
-`enter_password` é um binário Go de 32 bits com **dois estágios**. No primeiro, `main.checkPassword` compara `senha[i] XOR chave[i]` com uma tabela fixa (`main.statictmp_4`); como a chave e a tabela estão embutidas, a senha sai de `chave XOR tabela` = `reverseengineericanbarelyforward`. No segundo, `main.ambush` pede uma "unhashed key" e exige que `md5(entrada)` seja igual a `861836f13e3d627dfa375bdb8389214e` — o **mesmo** valor que serviu de chave XOR no estágio 1 é, na verdade, um hash MD5. Quebrando ele (rockyou) sai `goldfish`. Com os dois, o `get_flag` (deferido) lê o `flag.txt` do servidor e imprime a flag.
+`enter_password` é um binário Go de 32 bits com **dois estágios**. No primeiro, `main.checkPassword` compara `senha[i] XOR chave[i]` com uma tabela fixa (`main.statictmp_4`); como a chave e a tabela estão embutidas, a senha sai de `chave XOR tabela` = `reverseengineericanbarelyforward`. No segundo, `main.ambush` pede uma "unhashed key" e exige que `md5(entrada)` seja igual a `861836f13e3d627dfa375bdb8389214e`, o **mesmo** valor que serviu de chave XOR no estágio 1 é, na verdade, um hash MD5. Quebrando ele (rockyou) sai `goldfish`. Com os dois, o `get_flag` (deferido) lê o `flag.txt` do servidor e imprime a flag.
 
 > [!IMPORTANT]
-> **Ideia-chave:** o valor `861836f13e3d627dfa375bdb8389214e` aparece **duas vezes** no binário — como chave de XOR (estágio 1) e como MD5-alvo (estágio 2). Reconhecer que esses 32 caracteres hex são um hash MD5 é o pulo do gato: o estágio 1 é reversível na hora, o estágio 2 é uma quebra de hash.
+> **Ideia-chave:** o valor `861836f13e3d627dfa375bdb8389214e` aparece **duas vezes** no binário, como chave de XOR (estágio 1) e como MD5-alvo (estágio 2). Reconhecer que esses 32 caracteres hex são um hash MD5 é o pulo do gato: o estágio 1 é reversível na hora, o estágio 2 é uma quebra de hash.
 
 ## Enunciado
 
@@ -31,7 +31,7 @@
 
 <details><summary>Dica 1</summary>É um binário Go. <code>go tool objdump</code> ou Ghidra mostram <code>main.main</code>, <code>main.checkPassword</code>, <code>main.ambush</code> e <code>main.get_flag</code>. Repare que são DOIS prompts.</details>
 <details><summary>Dica 2</summary><code>checkPassword</code> exige senha de 32 bytes e faz <code>input[i] XOR key[i] == statictmp_4[i]</code>. A chave são 8 imediatos de 32 bits; a tabela é <code>main.statictmp_4</code>. Senha = chave XOR tabela.</details>
-<details><summary>Dica 3</summary>Passado o estágio 1, vem "What is the unhashed key?". <code>main.ambush</code> compara <code>md5(entrada)</code> com <code>861836f13e3d627dfa375bdb8389214e</code> — aquele mesmo valor da chave XOR é um MD5. Quebre o hash.</details>
+<details><summary>Dica 3</summary>Passado o estágio 1, vem "What is the unhashed key?". <code>main.ambush</code> compara <code>md5(entrada)</code> com <code>861836f13e3d627dfa375bdb8389214e</code>, aquele mesmo valor da chave XOR é um MD5. Quebre o hash.</details>
 
 ## Ambiente
 
@@ -40,7 +40,7 @@
 
 Gerei o disassembly uma vez e trabalhei em cima dele:
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 go tool objdump enter_password > objdump-go.txt
@@ -81,9 +81,9 @@ enter_password.go:23  ambush(input2)               ; estágio 2
 enter_password.go:24  defer get_flag()             ; lê flag.txt ao retornar
 ```
 
-Ou seja: a senha correta no estágio 1 só te leva ao segundo prompt. O `get_flag` é **deferido** e só executa quando `main` retorna — o que exige passar também pelo `ambush`.
+Ou seja: a senha correta no estágio 1 só te leva ao segundo prompt. O `get_flag` é **deferido** e só executa quando `main` retorna, o que exige passar também pelo `ambush`.
 
-### 3. Estágio 1 — `main.checkPassword`
+### 3. Estágio 1: `main.checkPassword`
 
 Três coisas saltam no disassembly:
 
@@ -96,7 +96,7 @@ MOVL $0x38313638, ...   MOVL $0x31663633, ...   MOVL $0x64336533, ...   MOVL $0x
 MOVL $0x37336166, ...   MOVL $0x62646235, ...   MOVL $0x39383338, ...   MOVL $0x65343132, ...
 ```
 
-Decodificando em little-endian, esses bytes formam a string ASCII `861836f13e3d627dfa375bdb8389214e` (32 caracteres hex — guarde isto, volta no estágio 2).
+Decodificando em little-endian, esses bytes formam a string ASCII `861836f13e3d627dfa375bdb8389214e` (32 caracteres hex, guarde isto, volta no estágio 2).
 
 **(c) o laço de verificação.** Para `i` de 0 a 31, faz `input[i] XOR key[i]` e compara com `main.statictmp_4[i]`:
 
@@ -115,7 +115,7 @@ senha[i] = key[i] XOR statictmp_4[i]
 
 Tenho `key` (os imediatos) e `statictmp_4` (constante na `.rodata`, lida direto do binário).
 
-### 4. Estágio 2 — `main.ambush`
+### 4. Estágio 2: `main.ambush`
 
 O segundo prompt ("What is the unhashed key?") cai em `main.ambush`, que:
 
@@ -129,7 +129,7 @@ enter_password.go:134  CMPL CL, AL / JE ...             ; compara char a char
 enter_password.go:135  os.Exit                          ; no primeiro byte diferente
 ```
 
-Traduzindo: o estágio 2 exige uma string cujo **`md5(string)` seja `861836f13e3d627dfa375bdb8389214e`**. Aquele valor que no estágio 1 era a chave do XOR é, na verdade, um hash MD5 — e aqui o desafio pede o preimage. Errar um byte sequer chama `os.Exit` (sem flag).
+Traduzindo: o estágio 2 exige uma string cujo **`md5(string)` seja `861836f13e3d627dfa375bdb8389214e`**. Aquele valor que no estágio 1 era a chave do XOR é, na verdade, um hash MD5, e aqui o desafio pede o preimage. Errar um byte sequer chama `os.Exit` (sem flag).
 
 ### 5. Recuperando as duas respostas
 
@@ -137,19 +137,37 @@ O [`scripts/script1.py`](scripts/script1.py) faz os dois estágios: recupera a s
 
 ```python
 #!/usr/bin/env python3
+# Solve do gogo (enter_password): DOIS estágios.
+#
+# Estágio 1 (main.checkPassword): para i em 0..31,  input[i] XOR key[i] == cmp[i]
+#   logo:  senha[i] = key[i] XOR cmp[i]
+#   - key: os 8 imediatos MOVL de 32 bits escritos no buffer (decodificados LE)
+#          = a string ASCII "861836f13e3d627dfa375bdb8389214e".
+#   - cmp: os 32 bytes de main.statictmp_4, lidos da seção .rodata do binário.
+#
+# Estágio 2 (main.ambush): le uma segunda entrada e exige
+#   md5(input2) == "861836f13e3d627dfa375bdb8389214e"  (o MESMO valor do estágio 1,
+#   que na verdade é um hash MD5). Errar chama os.Exit. Quebrando o MD5 -> "goldfish".
+#
+# Uso: python3 script1.py ./enter_password [wordlist]
+
 import struct, subprocess, sys, hashlib
 
 binpath  = sys.argv[1] if len(sys.argv) > 1 else "./enter_password"
 wordlist = sys.argv[2] if len(sys.argv) > 2 else "/usr/share/wordlists/rockyou.txt"
 
+# ---- Estágio 1: recuperar a senha ----
+# Os 8 dwords imediatos de checkPassword, na ordem em que são escritos.
 KEY_DWORDS = [0x38313638, 0x31663633, 0x64336533, 0x64373236,
               0x37336166, 0x62646235, 0x39383338, 0x65343132]
-key = b"".join(struct.pack("<I", d) for d in KEY_DWORDS)   # "861836...214e"
+key = b"".join(struct.pack("<I", d) for d in KEY_DWORDS)   # 32 bytes ASCII
 
-# Estágio 1: senha = key XOR statictmp_4 (statictmp_4 lido da .rodata)
+# Endereço do símbolo main.statictmp_4 (tabela de símbolos do ELF).
 syms = subprocess.run(["objdump", "-t", binpath], capture_output=True, text=True).stdout
 addr = next(int(l.split()[0], 16) for l in syms.splitlines()
             if l.strip().endswith("main.statictmp_4"))
+
+# Dump dos 32 bytes a partir desse endereço.
 dump = subprocess.run(
     ["objdump", "-s", "--start-address", hex(addr), "--stop-address", hex(addr + 32), binpath],
     capture_output=True, text=True).stdout
@@ -161,21 +179,26 @@ for line in dump.splitlines():
             if all(c in "0123456789abcdef" for c in grp):
                 cmp_bytes += bytes.fromhex(grp)
 cmp_bytes = cmp_bytes[:32]
+
 password = bytes(k ^ c for k, c in zip(key, cmp_bytes))
 print("estagio 1 (senha) =", password.decode())
 
-# Estágio 2: quebrar o MD5 (a própria key é o hash-alvo)
-target = key.decode()
+# ---- Estágio 2: quebrar o MD5 ----
+target = key.decode()   # "861836f13e3d627dfa375bdb8389214e" é um hash MD5
 unhashed = None
-with open(wordlist, "rb") as f:
-    for line in f:
-        w = line.rstrip(b"\n")
-        if hashlib.md5(w).hexdigest() == target:
-            unhashed = w.decode(errors="replace"); break
-print("estagio 2 (unhashed key) =", unhashed)
+try:
+    with open(wordlist, "rb") as f:
+        for line in f:
+            w = line.rstrip(b"\n")
+            if hashlib.md5(w).hexdigest() == target:
+                unhashed = w.decode(errors="replace")
+                break
+except FileNotFoundError:
+    print(f"[!] wordlist {wordlist} nao encontrada")
+print("estagio 2 (unhashed key) =", unhashed or "(nao quebrado nesta wordlist)")
 ```
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 python3 scripts/script1.py ./enter_password
@@ -190,7 +213,7 @@ estagio 2 (unhashed key) = goldfish
 
 Com as duas respostas, conecto na instância e respondo os dois prompts na ordem:
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 printf 'reverseengineericanbarelyforward\ngoldfish\n' | nc xebec.cylabacademy.net 23016
@@ -216,7 +239,7 @@ flowchart LR
 
 ## Por que funciona
 
-O estágio 1 não guarda a senha nem um hash dela: guarda a chave do XOR e o resultado esperado, ambos embutidos. XOR é sua própria inversa, então quem tem a chave e o resultado recupera a entrada offline. O estágio 2 reaproveita o mesmo material de outra forma — a "chave" era um MD5 o tempo todo, e basta quebrar o preimage (um valor fraco, presente na rockyou). O `flag.txt` só é lido pelo `get_flag` deferido quando `main` retorna, o que exige passar pelos dois estágios; errar o segundo chama `os.Exit` antes do defer rodar.
+O estágio 1 não guarda a senha nem um hash dela: guarda a chave do XOR e o resultado esperado, ambos embutidos. XOR é sua própria inversa, então quem tem a chave e o resultado recupera a entrada offline. O estágio 2 reaproveita o mesmo material de outra forma, a "chave" era um MD5 o tempo todo, e basta quebrar o preimage (um valor fraco, presente na rockyou). O `flag.txt` só é lido pelo `get_flag` deferido quando `main` retorna, o que exige passar pelos dois estágios; errar o segundo chama `os.Exit` antes do defer rodar.
 
 ## Remediação
 
@@ -225,15 +248,15 @@ O estágio 1 não guarda a senha nem um hash dela: guarda a chave do XOR e o res
 
 ## Lições e padrões
 
-- **Sinais para reconhecer:** um laço de 32 iterações com `XOR`/`CMP` contra um buffer copiado de constante = "entrada XOR chave == alvo", reversível na hora. Uma string de 32 caracteres hex é quase sempre um MD5 — teste quebrar antes de assumir que é só "dado".
+- **Sinais para reconhecer:** um laço de 32 iterações com `XOR`/`CMP` contra um buffer copiado de constante = "entrada XOR chave == alvo", reversível na hora. Uma string de 32 caracteres hex é quase sempre um MD5, teste quebrar antes de assumir que é só "dado".
 - **Da próxima vez eu tentaria primeiro:** desmontar `main.main` inteiro (não só `checkPassword`) para ver todos os estágios antes de concluir o fluxo.
-- **Onde perdi tempo:** inicialmente só analisei o estágio 1 e achei que a senha já dava a flag — o binário tem um segundo prompt (`ambush`) que só aparece ao rodar/ler `main.main` por completo.
+- **Onde perdi tempo:** inicialmente só analisei o estágio 1 e achei que a senha já dava a flag, o binário tem um segundo prompt (`ambush`) que só aparece ao rodar/ler `main.main` por completo.
 
 ## Referências
 
-- [Go — `cmd/objdump`](https://pkg.go.dev/cmd/objdump)
+- [Go: `cmd/objdump`](https://pkg.go.dev/cmd/objdump)
 - [`crypto/md5`](https://pkg.go.dev/crypto/md5)
-- picoCTF 2021 — gogo
+- picoCTF 2021, gogo
 
 ## Flag
 

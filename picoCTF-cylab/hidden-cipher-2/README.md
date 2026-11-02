@@ -19,7 +19,7 @@ O serviço faz uma pergunta de aritmética simples (ex.: `6 * 8`, `10 - 5`) e, d
 > **Ideia-chave:** a "resposta do probleminha de matemática" não é só um gate de acesso, ela é a própria **chave** do cipher. Cada byte da flag foi multiplicado por ela.
 
 > [!WARNING]
-> A operação da conta **muda a cada conexão** — pode ser `+`, `-` ou `*` (na mesma instância eu peguei `6 * 8` e depois `10 - 5`). O script resolve qualquer operador; não hardcode a conta. O sufixo da flag também muda por instância.
+> A operação da conta **muda a cada conexão**, pode ser `+`, `-` ou `*` (na mesma instância eu peguei `6 * 8` e depois `10 - 5`). O script resolve qualquer operador; não hardcode a conta. O sufixo da flag também muda por instância.
 
 ## Enunciado
 
@@ -44,7 +44,7 @@ O serviço faz uma pergunta de aritmética simples (ex.: `6 * 8`, `10 - 5`) e, d
 
 Na minha instância o serviço estava em `xebec.cylabacademy.net`, porta `48109`. Use o host e a porta da sua.
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 export TARGET_HOST=xebec.cylabacademy.net TARGET_PORT=48109
@@ -56,7 +56,7 @@ export TARGET_HOST=xebec.cylabacademy.net TARGET_PORT=48109
 
 Conecto e respondo a conta. A operação varia; neste exemplo veio uma multiplicação.
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 nc $TARGET_HOST $TARGET_PORT
@@ -71,7 +71,7 @@ Encoded flag values:
 A conta é `6 * 8 = 48`, e todos os valores da lista são múltiplos de 48 (4656/48 = 97, 4752/48 = 99, ...). 97 é `a`, 99 é `c`: já dá para sentir o `ac...` de `academy`.
 
 > [!TIP]
-> **Conceito: cipher multiplicativo.** Cada caractere virou `ord(c) * k`, com `k` sendo a resposta da conta. Como a multiplicação por uma constante conhecida é trivialmente reversível, basta dividir por `k` para recuperar o byte original. O "problema de matemática" é só uma forma de entregar a chave `k` — e se você não anotou `k`, o `gcd` de todos os valores devolve ele.
+> **Conceito: cipher multiplicativo.** Cada caractere virou `ord(c) * k`, com `k` sendo a resposta da conta. Como a multiplicação por uma constante conhecida é trivialmente reversível, basta dividir por `k` para recuperar o byte original. O "problema de matemática" é só uma forma de entregar a chave `k`, e se você não anotou `k`, o `gcd` de todos os valores devolve ele.
 
 ### 2. Revertendo
 
@@ -81,7 +81,7 @@ O script conecta, resolve a conta (qualquer que seja o operador), lê os valores
 
 ```python
 #!/usr/bin/env python3
-# Hidden Cipher 2 — o serviço pede uma conta de aritmética (a operação VARIA
+# Hidden Cipher 2: o serviço pede uma conta de aritmética (a operação VARIA
 # entre instâncias: +, - ou *), e a RESPOSTA dessa conta é a chave do cipher:
 # cada caractere da flag foi codificado como ord(c) * resposta.
 # Então eu respondo a conta, leio a lista de valores e divido cada um pela
@@ -131,7 +131,7 @@ print(flag)
 s.close()
 ```
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 python3 scripts/script1.py
@@ -143,7 +143,7 @@ Resposta: 5
 academy{m4th_b3h1nd_c1ph3r_e2aXXXXX}
 ```
 
-(A conta aqui veio diferente — `10 - 5` — mas o script resolve igual, e a flag é a mesma da instância.)
+(A conta aqui veio diferente, `10 - 5`, mas o script resolve igual, e a flag é a mesma da instância.)
 
 ## Cadeia de ataque
 
@@ -165,11 +165,11 @@ Um cipher multiplicativo por uma constante `k` não tem difusão nem segredo rea
 ## Lições e padrões
 
 - **Sinais para reconhecer:** uma lista de inteiros grandes todos divisíveis por um número pequeno e conhecido quase sempre é `ord(c) * k` ou `ord(c) + k`.
-- **Da próxima vez eu tentaria primeiro:** calcular o `gcd` da lista para achar o multiplicador — assim nem dependo de ter anotado a conta, e funciona mesmo se o operador mudar.
+- **Da próxima vez eu tentaria primeiro:** calcular o `gcd` da lista para achar o multiplicador, assim nem dependo de ter anotado a conta, e funciona mesmo se o operador mudar.
 
 ## Referências
 
-- picoCTF — Hidden Cipher 2 (Reverse)
+- picoCTF, Hidden Cipher 2 (Reverse)
 
 ## Flag
 

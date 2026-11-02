@@ -12,7 +12,7 @@
 
 ## TL;DR
 
-O binário tem um "malloc caseiro" com canário por chunk, mas o canário é `rand()` com `srand(time(0))` — previsível. O campo **Phone** é lido com `scanf("%s", ...)` sem limite, o que estoura para o cabeçalho do chunk seguinte. Eu crio dois funcionários, libero o primeiro e o recrio, usando o overflow do Phone para reescrever o cabeçalho do funcionário 1 com o canário correto (previsto pelo relógio) e sobrescrever o nome dele para `admin`. Com isso, "Get access token" me trata como admin e imprime a flag.
+O binário tem um "malloc caseiro" com canário por chunk, mas o canário é `rand()` com `srand(time(0))`, previsível. O campo **Phone** é lido com `scanf("%s", ...)` sem limite, o que estoura para o cabeçalho do chunk seguinte. Eu crio dois funcionários, libero o primeiro e o recrio, usando o overflow do Phone para reescrever o cabeçalho do funcionário 1 com o canário correto (previsto pelo relógio) e sobrescrever o nome dele para `admin`. Com isso, "Get access token" me trata como admin e imprime a flag.
 
 > [!IMPORTANT]
 > **Ideia-chave:** um canário só protege se for imprevisível. Aqui ele vem de `srand(time(0))`, então eu reproduzo o mesmo `rand()` localmente e passo pela verificação do heap enquanto estouro o chunk vizinho.
@@ -50,7 +50,7 @@ Na minha instância o serviço estava em `wily-courier.picoctf.net:61975`.
 scanf("%s", employee + 0x18);   // sem limite de tamanho
 ```
 
-Isso é um estouro de heap: dá para escrever além do espaço do funcionário, chegando ao cabeçalho do chunk seguinte. O obstáculo é o canário no meio do caminho — se eu sobrescrever o cabeçalho com um canário errado, o `heapcheck` aborta.
+Isso é um estouro de heap: dá para escrever além do espaço do funcionário, chegando ao cabeçalho do chunk seguinte. O obstáculo é o canário no meio do caminho, se eu sobrescrever o cabeçalho com um canário errado, o `heapcheck` aborta.
 
 > [!TIP]
 > **Conceito: canário previsível (`srand(time(0))`).** `rand()` é um PRNG determinístico; semeado com o horário (`time(0)`, resolução de 1 segundo), toda a sequência fica definida pelo segundo em que o processo começou. Reproduzindo `srand(ts); rand()` para o `ts` certo (com uma janela de alguns segundos para o skew de relógio), eu prevejo o canário e escrevo o valor correto no overflow. Referência: [`rand(3)`](https://man7.org/linux/man-pages/man3/rand.3.html).
@@ -69,7 +69,7 @@ Então o plano é: criar funcionário 0 e 1, liberar o 0, recriá-lo e, no Phone
 
 ### 3. Prevendo o canário e disparando
 
-O canário tem que sobreviver ao `scanf("%s")`, que corta em whitespace — então descarto qualquer canário que contenha bytes `0x09..0x0d` ou `0x20`. Faço força bruta numa janela de segundos em volta do `time(0)` do servidor.
+O canário tem que sobreviver ao `scanf("%s")`, que corta em whitespace, então descarto qualquer canário que contenha bytes `0x09..0x0d` ou `0x20`. Faço força bruta numa janela de segundos em volta do `time(0)` do servidor.
 
 #### `scripts/script1.py` (+ [`scripts/canary.c`](scripts/canary.c))
 
@@ -116,7 +116,7 @@ for _ in range(80):                                # repete com janela de tempo
 
 `canary.c` é a mesma previsão em C (`srand(time(0)+offset); printf("%d", rand())`), útil para validar a semente contra a versão de `rand()` do servidor sem depender da `libc` da minha máquina.
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 python3 scripts/script1.py
@@ -140,7 +140,7 @@ flowchart LR
 
 ## Por que funciona
 
-A proteção do alocador é o canário no cabeçalho, mas ele é gerado por um PRNG semeado com o tempo, então é previsível com resolução de segundos — eu escrevo o valor certo e o `heapcheck` não percebe o estouro. A primitiva de escrita vem do `scanf("%s")` sem limite no Phone, que atravessa a fronteira do chunk e alcança o cabeçalho e o nome do funcionário vizinho. Sobrescrevendo o nome para `admin` depois da checagem anti-admin, a rotina de token me promove e revela a flag.
+A proteção do alocador é o canário no cabeçalho, mas ele é gerado por um PRNG semeado com o tempo, então é previsível com resolução de segundos, eu escrevo o valor certo e o `heapcheck` não percebe o estouro. A primitiva de escrita vem do `scanf("%s")` sem limite no Phone, que atravessa a fronteira do chunk e alcança o cabeçalho e o nome do funcionário vizinho. Sobrescrevendo o nome para `admin` depois da checagem anti-admin, a rotina de token me promove e revela a flag.
 
 ## Remediação
 
@@ -152,12 +152,12 @@ A proteção do alocador é o canário no cabeçalho, mas ele é gerado por um P
 
 - **Sinais para reconhecer:** "canário caseiro" + qualquer `rand()`/`time()` = previsível. `scanf("%s")`/`gets` = overflow sem limite.
 - **Da próxima vez eu tentaria primeiro:** mapear o layout do chunk localmente (distâncias Phone→header→nome do vizinho) antes de brigar com o remoto.
-- **Onde perdi tempo:** descartar canários com bytes de whitespace — sem esse filtro, o `scanf` trunca o payload e o ataque falha silenciosamente.
+- **Onde perdi tempo:** descartar canários com bytes de whitespace, sem esse filtro, o `scanf` trunca o payload e o ataque falha silenciosamente.
 
 ## Referências
 
 - [`rand(3)` / `srand(3)`](https://man7.org/linux/man-pages/man3/rand.3.html)
-- [pwntools — tubes](https://docs.pwntools.com/en/stable/tubes.html)
+- [pwntools: tubes](https://docs.pwntools.com/en/stable/tubes.html)
 
 ## Flag
 

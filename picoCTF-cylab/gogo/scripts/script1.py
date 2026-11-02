@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Solve do gogo (enter_password) — DOIS estágios.
+# Solve do gogo (enter_password): DOIS estágios.
 #
 # Estágio 1 (main.checkPassword): para i em 0..31,  input[i] XOR key[i] == cmp[i]
 #   logo:  senha[i] = key[i] XOR cmp[i]

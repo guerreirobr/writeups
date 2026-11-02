@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Hidden Cipher 2 — o serviço pede uma conta de aritmética (a operação VARIA
+# Hidden Cipher 2: o serviço pede uma conta de aritmética (a operação VARIA
 # entre instâncias: +, - ou *), e a RESPOSTA dessa conta é a chave do cipher:
 # cada caractere da flag foi codificado como ord(c) * resposta.
 # Então eu respondo a conta, leio a lista de valores e divido cada um pela

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Hashgate — IDOR via MD5(id) sequencial. O endpoint /profile/user/<md5(id)>
+# Hashgate: IDOR via MD5(id) sequencial. O endpoint /profile/user/<md5(id)>
 # não exige autenticação; o guest tem ID 3000. Varro IDs em volta de 3000,
 # calculo MD5 de cada um e procuro o perfil do admin (que traz a flag).
 #

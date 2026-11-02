@@ -50,7 +50,7 @@ vuln: ELF 64-bit LSB executable, x86-64, dynamically linked, no PIE
 libc.so.6: GNU C Library (Ubuntu GLIBC 2.27-3ubuntu1.2)
 ```
 
-Sem PIE significa endereços fixos no binário. O programa é um "echo server": lê a entrada, passa por uma função `convert_case` (que embaralha maiúsculas/minúsculas — o banner sai `WeLcOmE To mY EcHo sErVeR!`) e devolve. A leitura estoura o buffer da stack.
+Sem PIE significa endereços fixos no binário. O programa é um "echo server": lê a entrada, passa por uma função `convert_case` (que embaralha maiúsculas/minúsculas, o banner sai `WeLcOmE To mY EcHo sErVeR!`) e devolve. A leitura estoura o buffer da stack.
 
 Pelo frame (`buffer` em `rbp-0x80` = 128 bytes, mais 8 do `rbp` salvo), o RIP fica no offset **136**. Os gadgets saem do próprio binário:
 
@@ -62,19 +62,19 @@ ret     = 0x40052e   # usado para alinhar a stack (movaps) antes de system
 > [!TIP]
 > **Conceito: ret2libc com leak.** O ASLR aleatoriza a base da libc, mas não os offsets internos. Se eu vazo o endereço real de uma função conhecida (`puts`), subtraio o offset dela na `libc.so.6` fornecida e obtenho a base da libc daquela sessão. A partir daí, qualquer símbolo (`system`) e string (`/bin/sh`) tem endereço calculável. Referência: [ret2libc](https://ir0nstone.gitbook.io/notes/types/stack/return-oriented-programming/ret2libc).
 
-### 2. Fase 1 — vazar `puts` e voltar para `main`
+### 2. Fase 1: vazar `puts` e voltar para `main`
 
 Primeiro payload: lixo até o RIP, depois `pop rdi; ret` com `puts@got` em RDI, chama `puts@plt` (imprime o endereço real de `puts`) e retorna para `main`, para poder enviar um segundo payload.
 
 > **Detalhe que precisou de cuidado:** o programa imprime o buffer com `puts(buffer)` antes do leak, então a primeira linha recebida é só o eco; o endereço vazado vem na linha seguinte. Os bytes dos gadgets (`0x09`, `0x13`, `0x40`, ...) não caem na faixa de letras ASCII, então `convert_case` não os altera.
 
-### 3. Fase 2 — `system("/bin/sh")`
+### 3. Fase 2: `system("/bin/sh")`
 
 Com a base da libc, monto o segundo payload: um `ret` para alinhar a stack (a glibc 2.27 usa `movaps`, que exige stack alinhada em 16), depois `pop rdi; ret` com o endereço de `"/bin/sh"` e por fim `system`.
 
 #### `scripts/script1.py`
 
-Script completo ([`scripts/script1.py`](scripts/script1.py)) — é exatamente ele que roda:
+Script completo ([`scripts/script1.py`](scripts/script1.py)), é exatamente ele que roda:
 
 ```python
 from pwn import *
@@ -187,7 +187,7 @@ p.sendline(b"cat flag.txt")
 p.interactive()
 ```
 
-***INSERIR no terminal — Kali (atacante)
+***INSERIR no terminal: Kali (atacante)
 
 ```bash
 python3 scripts/script1.py
@@ -217,7 +217,7 @@ flowchart LR
 
 ## Por que funciona
 
-O estouro dá controle do RIP. Sem PIE, os gadgets e a PLT/GOT têm endereços fixos, o que permite construir o ROP sem nenhum leak prévio. O `puts(puts@got)` transforma um endereço fixo (GOT) no endereço real de `puts` na libc, quebrando o ASLR da libc — que só randomiza a base, não os offsets. Com a `libc.so.6` certa, a base e todos os símbolos saem por subtração. O segundo `main` existe só para reusar a mesma primitiva de leitura num estado já conhecido.
+O estouro dá controle do RIP. Sem PIE, os gadgets e a PLT/GOT têm endereços fixos, o que permite construir o ROP sem nenhum leak prévio. O `puts(puts@got)` transforma um endereço fixo (GOT) no endereço real de `puts` na libc, quebrando o ASLR da libc, que só randomiza a base, não os offsets. Com a `libc.so.6` certa, a base e todos os símbolos saem por subtração. O segundo `main` existe só para reusar a mesma primitiva de leitura num estado já conhecido.
 
 ## Remediação
 
@@ -233,8 +233,8 @@ O estouro dá controle do RIP. Sem PIE, os gadgets e a PLT/GOT têm endereços f
 
 ## Referências
 
-- [ir0nstone — ret2libc](https://ir0nstone.gitbook.io/notes/types/stack/return-oriented-programming/ret2libc)
-- [pwntools — ELF/ROP](https://docs.pwntools.com/en/stable/elf.html)
+- [ir0nstone: ret2libc](https://ir0nstone.gitbook.io/notes/types/stack/return-oriented-programming/ret2libc)
+- [pwntools: ELF/ROP](https://docs.pwntools.com/en/stable/elf.html)
 
 ## Flag
 
