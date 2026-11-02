@@ -8,7 +8,7 @@ context.log_level = "info"
 elf = ELF("./vuln")
 libc = ELF("./libc.so.6")
 
-# Alvo remoto do picoCTF
+# Alvo remoto (troque pelo host:porta da sua instância)
 HOST = "chatelaine.cylabacademy.net"
 PORT = 22586
 
