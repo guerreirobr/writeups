@@ -448,11 +448,11 @@ Decodificando o payload do JWT que o bridge devolveu: `{"sub":"admin","role":"pr
 
 ```mermaid
 flowchart LR
-    A[WebView: JS on + addJavascriptInterface] --> B[AndroidBridge.getAuthToken expõe o JWT]
-    B --> C[/api/webview/simulate roda JS com o bridge]
-    C --> D[JWT sub=admin extraído]
-    D --> E[GET /api/properties/admin + Bearer]
-    E --> F[Propriedades restritas + flag]
+    A["WebView: JS on + addJavascriptInterface"] --> B["AndroidBridge.getAuthToken expõe o JWT"]
+    B --> C["/api/webview/simulate roda JS com o bridge"]
+    C --> D["JWT sub=admin extraído"]
+    D --> E["GET /api/properties/admin + Bearer"]
+    E --> F["Propriedades restritas + flag"]
 ```
 
 ## Por que funciona

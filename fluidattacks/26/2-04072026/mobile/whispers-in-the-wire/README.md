@@ -108,12 +108,12 @@ A primeira mensagem é a thread privada `admin -> ops` (`"private":true`), que a
 
 ```mermaid
 flowchart LR
-    A[Decompila APK] --> B[API key compartilhada no código]
-    A --> C[Retrofit: rota oculta api/admin/messages]
-    B --> D[curl /api/admin/messages com a key]
+    A["Decompila APK"] --> B["API key compartilhada no código"]
+    A --> C["Retrofit: rota oculta api/admin/messages"]
+    B --> D["curl /api/admin/messages com a key"]
     C --> D
-    D --> E[Thread privada admin -> ops]
-    E --> F[Flag]
+    D --> E["Thread privada admin -> ops"]
+    E --> F["Flag"]
 ```
 
 ## Por que funciona

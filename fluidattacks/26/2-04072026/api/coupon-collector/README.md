@@ -324,11 +324,11 @@ Cinco variações bastaram: `20 + 20 + 20 + 20 + 20 = 100%`, subtotal 89.99 viro
 
 ```mermaid
 flowchart LR
-    A[Produto no carrinho: 89.99] --> B[WELCOME20 vale 20%]
-    B --> C[Validação normaliza, dedup usa string crua]
-    C --> D[5 variações de case empilham 20% cada]
-    D --> E[Total 0.0]
-    E --> F[Checkout grátis devolve a flag]
+    A["Produto no carrinho: 89.99"] --> B["WELCOME20 vale 20%"]
+    B --> C["Validação normaliza, dedup usa string crua"]
+    C --> D["5 variações de case empilham 20% cada"]
+    D --> E["Total 0.0"]
+    E --> F["Checkout grátis devolve a flag"]
 ```
 
 ## Por que funciona

@@ -201,10 +201,10 @@ curl -s "$TARGET/dashboard" -b 'session_token=eyJ1c2VyIjoiZ3VlcnJlaXJvIiwicm9sZS
 
 ```mermaid
 flowchart LR
-    A[Cookie = base64 de JSON role admin] --> B[AES-GCM decrypt_and_verify falha]
-    B --> C[except: json.loads sem chave]
-    C --> D[role=admin aceito]
-    D --> E[Dashboard imprime a flag]
+    A["Cookie = base64 de JSON role admin"] --> B["AES-GCM decrypt_and_verify falha"]
+    B --> C["except: json.loads sem chave"]
+    C --> D["role=admin aceito"]
+    D --> E["Dashboard imprime a flag"]
 ```
 
 ## Por que funciona

@@ -393,11 +393,11 @@ Trocando `1=1` por `1=0`, `count` vira 0. Essa diferença é o bit que a extraç
 
 ```mermaid
 flowchart LR
-    A[GET /api/surveys/ com params] --> B[filter request.GET.dict spread]
-    B --> C[_connector controlado = injeção no WHERE]
-    C --> D[oráculo booleano 1=1 vs 1=0]
-    D --> E[LIKE em surveys_adminnote.value char a char]
-    E --> F[Flag reconstruída]
+    A["GET /api/surveys/ com params"] --> B["filter request.GET.dict spread"]
+    B --> C["_connector controlado = injeção no WHERE"]
+    C --> D["oráculo booleano 1=1 vs 1=0"]
+    D --> E["LIKE em surveys_adminnote.value char a char"]
+    E --> F["Flag reconstruída"]
 ```
 
 ## Por que funciona

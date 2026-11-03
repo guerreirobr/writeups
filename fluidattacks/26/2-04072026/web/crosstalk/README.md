@@ -441,12 +441,12 @@ O token vazado (`f2600e7f...`) é exatamente o `HEARTBEAT_TOKEN` do processo, qu
 
 ```mermaid
 flowchart LR
-    A[Usuário comum cria subscription] --> B[url_template com actor.context.continuation_id]
-    B --> C[system.heartbeat broadcast ignora filtro]
-    C --> D[render do template contra o evento secreto]
-    D --> E[audit log do dono traz HEARTBEAT_TOKEN]
-    E --> F[X-Heartbeat-Token -> /api/v2/admin/control]
-    F --> G[Flag]
+    A["Usuário comum cria subscription"] --> B["url_template com actor.context.continuation_id"]
+    B --> C["system.heartbeat broadcast ignora filtro"]
+    C --> D["render do template contra o evento secreto"]
+    D --> E["audit log do dono traz HEARTBEAT_TOKEN"]
+    E --> F["X-Heartbeat-Token -> /api/v2/admin/control"]
+    F --> G["Flag"]
 ```
 
 ## Por que funciona

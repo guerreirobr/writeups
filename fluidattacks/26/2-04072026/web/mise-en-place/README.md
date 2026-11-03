@@ -341,10 +341,10 @@ curl -sk "https://$TARGET/profile/decad4bf-db81-4cd6-b172-57623bd7d736" | grep -
 
 ```mermaid
 flowchart LR
-    A[HTML comenta /api/users] --> B[GET /api/users lista todos]
-    B --> C[UUID do Chef Admin role=admin]
-    C --> D[GET /profile/uuid-do-admin sem auth]
-    D --> E[Perfil do admin mostra a System Flag]
+    A["HTML comenta /api/users"] --> B["GET /api/users lista todos"]
+    B --> C["UUID do Chef Admin role=admin"]
+    C --> D["GET /profile/uuid-do-admin sem auth"]
+    D --> E["Perfil do admin mostra a System Flag"]
 ```
 
 ## Por que funciona

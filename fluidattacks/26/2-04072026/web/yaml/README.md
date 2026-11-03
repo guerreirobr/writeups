@@ -186,10 +186,10 @@ curl -sk "https://$TARGET/convert" -H 'Content-Type: application/json' \
 
 ```mermaid
 flowchart LR
-    A[POST /convert com YAML malicioso] --> B[yaml.load Loader=yaml.Loader]
-    B --> C[tag !!python/object/apply builtins.eval]
-    C --> D[eval executa os.popen cat /flag.txt]
-    D --> E[flag volta no campo result]
+    A["POST /convert com YAML malicioso"] --> B["yaml.load Loader=yaml.Loader"]
+    B --> C["tag !!python/object/apply builtins.eval"]
+    C --> D["eval executa os.popen cat /flag.txt"]
+    D --> E["flag volta no campo result"]
 ```
 
 ## Por que funciona

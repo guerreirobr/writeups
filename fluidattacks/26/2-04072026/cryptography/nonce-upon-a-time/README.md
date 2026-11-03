@@ -705,11 +705,11 @@ Com 40 assinaturas o lattice já fechou: `40/40` nonces caíram no intervalo `< 
 
 ```mermaid
 flowchart LR
-    A[/api/sign tokens standard] --> B[Nonce k < 2^248]
-    B --> C[k = a*d + b mod n por assinatura]
-    C --> D[Lattice + LLL recuperam d]
-    D --> E[Assino token admin local]
-    E --> F[/api/activate devolve a flag]
+    A["/api/sign tokens standard"] --> B["Nonce k < 2^248"]
+    B --> C["k = a*d + b mod n por assinatura"]
+    C --> D["Lattice + LLL recuperam d"]
+    D --> E["Assino token admin local"]
+    E --> F["/api/activate devolve a flag"]
 ```
 
 ## Por que funciona

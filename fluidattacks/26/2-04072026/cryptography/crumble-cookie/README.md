@@ -473,11 +473,11 @@ Repare no `forged_token_bytes`: o `\x80\x00...\x01\xa8` é o padding do SHA-256 
 
 ```mermaid
 flowchart LR
-    A[GET /files: token + sig públicos] --> B[SHA256 segredo primeiro]
-    B --> C[Length extension: anexo &file=private/flag.txt]
-    C --> D[Parser deixa o último file= vencer]
-    D --> E[GET /download com sig forjada]
-    E --> F[Flag]
+    A["GET /files: token + sig públicos"] --> B["SHA256 segredo primeiro"]
+    B --> C["Length extension: anexo &file=private/flag.txt"]
+    C --> D["Parser deixa o último file= vencer"]
+    D --> E["GET /download com sig forjada"]
+    E --> F["Flag"]
 ```
 
 ## Por que funciona

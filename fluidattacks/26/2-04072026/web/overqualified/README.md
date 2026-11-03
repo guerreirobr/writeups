@@ -328,11 +328,11 @@ Repare no dashboard logo após o registro: o usuário já aparece como **Staff**
 
 ```mermaid
 flowchart LR
-    A[GET /register/ pega CSRF] --> B[POST /register/ com is_staff=true]
-    B --> C[backend bind sem allowlist]
-    C --> D[usuário criado como Staff]
-    D --> E[GET /admin/dashboard/ com a sessão]
-    E --> F[Internal System Key = flag]
+    A["GET /register/ pega CSRF"] --> B["POST /register/ com is_staff=true"]
+    B --> C["backend bind sem allowlist"]
+    C --> D["usuário criado como Staff"]
+    D --> E["GET /admin/dashboard/ com a sessão"]
+    E --> F["Internal System Key = flag"]
 ```
 
 ## Por que funciona

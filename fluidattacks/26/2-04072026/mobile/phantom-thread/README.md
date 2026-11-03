@@ -277,12 +277,12 @@ am start -n com.fluidctf.messenger/.sdk.AnalyticsRedirectActivity --es next_inte
 
 ```mermaid
 flowchart LR
-    A[Intent externo] --> B[AnalyticsRedirectActivity exported]
-    B --> C[getParcelableExtra next_intent]
-    C --> D[startActivity com identidade do app]
-    D --> E[AdminPanelActivity privada abre]
-    E --> F[Busca /api/admin/flag com ADMIN_TOKEN]
-    F --> G[Flag]
+    A["Intent externo"] --> B["AnalyticsRedirectActivity exported"]
+    B --> C["getParcelableExtra next_intent"]
+    C --> D["startActivity com identidade do app"]
+    D --> E["AdminPanelActivity privada abre"]
+    E --> F["Busca /api/admin/flag com ADMIN_TOKEN"]
+    F --> G["Flag"]
 ```
 
 ## Por que funciona

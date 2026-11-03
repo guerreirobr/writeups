@@ -187,11 +187,11 @@ O "Access denied." é a função normal reclamando da senha errada; logo depois,
 
 ```mermaid
 flowchart LR
-    A[Password length = -1] --> B[validação assinada aceita]
-    B --> C[loop unsigned lê 0xffffffff]
-    C --> D[overflow preservando contador em offset 76]
-    D --> E[sobrescreve RIP: ret + win 0x401b85]
-    E --> F[win imprime a flag]
+    A["Password length = -1"] --> B["validação assinada aceita"]
+    B --> C["loop unsigned lê 0xffffffff"]
+    C --> D["overflow preservando contador em offset 76"]
+    D --> E["sobrescreve RIP: ret + win 0x401b85"]
+    E --> F["win imprime a flag"]
 ```
 
 ## Por que funciona

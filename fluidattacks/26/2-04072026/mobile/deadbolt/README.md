@@ -507,11 +507,11 @@ POST_api_vault_admin_Fl00d_G4t3s_0p3n_
 
 ```mermaid
 flowchart LR
-    A[Decompila APK] --> B[SEED + SALT + device_id previsível]
-    B --> C[PBKDF2 reproduz a vaultKey]
-    C --> D[Decifra vault_backup.enc]
-    D --> E[Senha Admin Portal: Fl00d_G4t3s_0p3n!]
-    E --> F[POST /api/vault/admin -> flag]
+    A["Decompila APK"] --> B["SEED + SALT + device_id previsível"]
+    B --> C["PBKDF2 reproduz a vaultKey"]
+    C --> D["Decifra vault_backup.enc"]
+    D --> E["Senha Admin Portal: Fl00d_G4t3s_0p3n!"]
+    E --> F["POST /api/vault/admin -> flag"]
 ```
 
 ## Por que funciona

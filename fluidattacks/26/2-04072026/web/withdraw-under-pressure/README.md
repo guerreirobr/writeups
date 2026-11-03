@@ -481,11 +481,11 @@ Quatro transferências de US$ 100 levaram a principal de US$ 100 a US$ 500. A co
 
 ```mermaid
 flowchart LR
-    A[Conta nova ganha $100] --> B[Crio 1 principal + 4 auxiliares]
-    B --> C[Cada auxiliar transfere $100 para a principal]
-    C --> D[Principal com $500]
-    D --> E[POST /store/buy premium_access]
-    E --> F[Certificado premium = flag]
+    A["Conta nova ganha $100"] --> B["Crio 1 principal + 4 auxiliares"]
+    B --> C["Cada auxiliar transfere $100 para a principal"]
+    C --> D["Principal com $500"]
+    D --> E["POST /store/buy premium_access"]
+    E --> F["Certificado premium = flag"]
 ```
 
 ## Por que funciona

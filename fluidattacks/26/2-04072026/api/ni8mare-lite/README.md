@@ -314,12 +314,12 @@ POST /api/workflows/evaluate
 
 ```mermaid
 flowchart LR
-    A[/api/health: BOOT_TIMESTAMP] --> C[Deriva chave XOR]
-    B[/api/webhooks/trigger: lê config.json XORado] --> C
-    C --> D[SESSION_SECRET em claro]
-    D --> E[Forja JWT role=admin]
-    E --> F[/api/workflows/evaluate: exec sandbox]
-    F --> G[catch_warnings escape -> os -> lê /flag_*.txt]
+    A["/api/health: BOOT_TIMESTAMP"] --> C["Deriva chave XOR"]
+    B["/api/webhooks/trigger: lê config.json XORado"] --> C
+    C --> D["SESSION_SECRET em claro"]
+    D --> E["Forja JWT role=admin"]
+    E --> F["/api/workflows/evaluate: exec sandbox"]
+    F --> G["catch_warnings escape -> os -> lê /flag_*.txt"]
 ```
 
 ## Por que funciona

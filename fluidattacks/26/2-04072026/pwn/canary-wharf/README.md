@@ -325,12 +325,12 @@ Repare no canary vazado: `0xd51ee833e1d17200`, terminando em `00` (o byte nulo q
 
 ```mermaid
 flowchart LR
-    A[check_balance: printf note] --> B[format string]
-    B --> C[%25$p = canary, %3$p = libc]
-    C --> D[transfer_funds: read 256 em buf 64]
-    D --> E[overflow preservando canary]
-    E --> F[ret2libc: pop rdi, /bin/sh, system]
-    F --> G[shell root -> /flag.txt]
+    A["check_balance: printf note"] --> B["format string"]
+    B --> C["%25$p = canary, %3$p = libc"]
+    C --> D["transfer_funds: read 256 em buf 64"]
+    D --> E["overflow preservando canary"]
+    E --> F["ret2libc: pop rdi, /bin/sh, system"]
+    F --> G["shell root -> /flag.txt"]
 ```
 
 ## Por que funciona

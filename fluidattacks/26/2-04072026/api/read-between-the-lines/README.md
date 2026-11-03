@@ -299,11 +299,11 @@ curl -sk "https://$TARGET/api/profile/....//admin/flag"
 
 ```mermaid
 flowchart LR
-    A[GET /api/profile/....//admin/flag] --> B[replace ../ recria ../]
-    B --> C[safe_username = ../admin/flag]
-    C --> D[GET backend /users/../admin/flag]
-    D --> E[backend normaliza para /admin/flag]
-    E --> F[Rota interna devolve a flag]
+    A["GET /api/profile/....//admin/flag"] --> B["replace ../ recria ../"]
+    B --> C["safe_username = ../admin/flag"]
+    C --> D["GET backend /users/../admin/flag"]
+    D --> E["backend normaliza para /admin/flag"]
+    E --> F["Rota interna devolve a flag"]
 ```
 
 ## Por que funciona
