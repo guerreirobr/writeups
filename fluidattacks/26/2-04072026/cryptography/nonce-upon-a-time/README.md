@@ -695,7 +695,7 @@ SAMPLES=70 python3 scripts/script2.py
 [*] Enviando token admin para /api/activate
 ================================================================================
 [*] Status: 200
-{"flag":"flag{82873b8f6c4dd74XXXXX}","license":"admin","message":"Administrative license activated successfully","status":"activated"}
+{"flag":"flag{82873b8f6c4XXXXX}","license":"admin","message":"Administrative license activated successfully","status":"activated"}
 [+] FLAG ENCONTRADA
 ```
 
@@ -734,5 +734,5 @@ A suposição quebrada é que um nonce "aleatório" é seguro mesmo truncado. Em
 ## Flag
 
 ```text
-flag{82873b8f6c4dd74XXXXX}
+flag{82873b8f6c4XXXXX}
 ```
