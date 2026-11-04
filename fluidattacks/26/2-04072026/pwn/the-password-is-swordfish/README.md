@@ -41,7 +41,36 @@ Na minha instância o serviço estava em `HOST:443` com TLS (o script já trata)
 
 ## Resolução
 
-### 1. checksec e o bug de inteiro
+### 1. Extração e símbolos
+
+O `public.zip` (senha `infected`) traz o binário `vault` e um core dump. `unzip` não abre o AES, então `7z`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+7z x -pinfected public.zip -oattachments -y && file attachments/vault
+```
+
+```text
+attachments/vault: ELF 64-bit LSB executable, x86-64, statically linked, not stripped
+```
+
+Binário estático e não stripped: tenho os nomes das funções. O `nm` entrega logo o alvo clássico de ret2win, uma função `win`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+nm attachments/vault | grep -iE ' win| login'
+```
+
+```text
+0000000000401b85 T win
+0000000000401c03 T login
+```
+
+Já anoto: `win()` em `0x401b85` (vou precisar desse endereço). Falta uma primitiva para desviar a execução até lá.
+
+### 2. checksec e o bug de inteiro
 
 ***INSERIR no terminal: Kali (atacante)
 
@@ -62,7 +91,7 @@ No PIE é o detalhe de ouro: todos os endereços do binário são fixos. Testand
 > [!TIP]
 > **Conceito: confusão signed/unsigned (CWE-195).** Um valor comparado como `int` e usado como `size_t`/`unsigned` tem dois significados. `-1` é "menor que 64" na comparação assinada e "enorme" quando reinterpretado sem sinal. É a forma mais comum de furar uma checagem de tamanho de buffer. Referência: [CWE-195: Signed to Unsigned Conversion Error](https://cwe.mitre.org/data/definitions/195.html).
 
-### 2. Layout do stack (com ajuda do core dump)
+### 3. Layout do stack (com ajuda do core dump)
 
 Com o core dump fornecido e um padrão cíclico no GDB, confirmei o layout do frame de `login`:
 
@@ -75,9 +104,25 @@ return addr  : rbp+0x8   (offset 88)
 
 O detalhe que me pegaria sem o core: o **contador do loop** mora dentro da zona que eu estouro, no offset 76. Se eu sobrescrever com lixo, o índice de escrita do loop pula ou trava. Então eu reescrevo o contador com o próprio valor que ele teria naquele ponto (`0x4c = 76`), mantendo o loop coerente enquanto continuo escrevendo até o retorno.
 
-### 3. ret2win
+### 4. ret2win
 
-`win()` está em `0x401b85`. Como é No PIE, uso o endereço direto. Coloco um gadget `ret` (`0x401d2d`, o ret final de `login`) antes de `win()` para alinhar a stack em 16 bytes (a função abre arquivo e usa `printf`, que precisa do alinhamento). Script remoto completo, idêntico ao arquivo em `scripts/`:
+`win()` está em `0x401b85` (do `nm` da etapa 1). Como é No PIE, uso o endereço direto. Coloco um gadget `ret` (`0x401d2d`, o ret final de `login`) antes de `win()` para alinhar a stack em 16 bytes (a função abre arquivo e usa `printf`, que precisa do alinhamento).
+
+Antes do remoto, validei tudo local com o `script1.py` (mesmo payload, processo local). O `win()` local abre um arquivo de flag falso, então o sucesso é imprimir o conteúdo de teste:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+python3 scripts/script1.py
+```
+
+```text
+[*] win() = 0x401b85
+[+] Starting local process './attachments/vault': pid 199915
+FAKE_FLAG_CONTENTS_RAM{test}
+```
+
+`FAKE_FLAG_CONTENTS_RAM{test}` é o conteúdo que o `win()` lê no ambiente local: prova de que o offset, o contador recolocado e o alinhamento estão certos. Com o payload validado, troco o alvo pro remoto. Script remoto completo, idêntico ao arquivo em `scripts/`:
 
 #### `scripts/script2.py`
 
