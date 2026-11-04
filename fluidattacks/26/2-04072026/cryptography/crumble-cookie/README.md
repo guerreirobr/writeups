@@ -42,9 +42,55 @@ Na minha instância era esse host. Use o da sua (o script lê a env var `TARGET`
 
 ## Resolução
 
-### 1. Reconhecimento: como os tokens são gerados
+### 1. Extração dos arquivos
 
-Primeiro peguei a cara da API e um token legítimo em `/files`:
+O desafio entrega um `public.zip` protegido com a senha padrão da plataforma (`infected`). Extraí para ler o `app.py`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+7z x -pinfected public.zip && find . -maxdepth 1 -type f -name '*.py'
+```
+
+```text
+./app.py
+```
+
+Uso `7z` porque os zips dessa plataforma vêm cifrados com AES (o `unzip` do Info-ZIP reclama de "unsupported compression method 99"). Com o `app.py` em mãos, já dá para entender a geração dos tokens antes mesmo de tocar no servidor.
+
+### 2. Achar o esquema certo e pegar um token
+
+Minha primeira rodada do exploit apontou o alvo sem esquema e o código tentou `http://` primeiro. Travou:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+TARGET=9c3414f6c6555f5b.chal.ctf.ae python3 script1.py
+```
+
+```text
+[*] Target: 9c3414f6c6555f5b.chal.ctf.ae
+[*] Tamanho conhecido do SECRET_KEY: 16 bytes
+...
+TimeoutError: timed out
+```
+
+**Isso não funcionou** (pule ao replicar): o `http://` do alvo não responde. Confirmei qual esquema está vivo testando os dois com `curl`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+for SCHEME in http https; do echo "== $SCHEME =="; curl -k -sS --max-time 12 "$SCHEME://$TARGET/files"; echo; done
+```
+
+```text
+== http ==
+curl: (28) Connection timed out after 12003 milliseconds
+== https ==
+{"files":[{"download":"/download?token=...","path":"public/notes.txt","sig":"41f55a0b...","token":"action=download&file=public/notes.txt"}, ...]}
+```
+
+HTTP morto, HTTPS vivo. A partir daqui sempre passo `TARGET=https://...` (ou deixo o script preferir HTTPS). Agora com o esquema certo, pego a cara do `/files` com calma:
 
 ***INSERIR no terminal: Kali (atacante)
 
@@ -68,7 +114,7 @@ curl -sk https://$TARGET/files | python3 -m json.tool
 
 Então eu tenho, de graça, uma mensagem conhecida (`action=download&file=public/notes.txt`) e a assinatura dela. Guarde isso: é a matéria-prima do ataque.
 
-### 2. Revisão do código: a assinatura é feita errada
+### 3. Revisão do código: a assinatura é feita errada
 
 #### `app.py`
 
@@ -110,7 +156,7 @@ Ou seja: se eu conseguir um token cujo `file` final seja `private/flag.txt` **co
 > [!TIP]
 > **Conceito: length extension attack (Merkle-Damgård).** SHA-256 processa a mensagem em blocos de 64 bytes e carrega um estado interno de 256 bits de um bloco pro outro. No fim, esse estado interno *é* o digest. Se eu conheço `H = SHA256(segredo || msg)` e o tamanho de `segredo || msg`, eu uso `H` como estado inicial, aplico o padding que o algoritmo teria colocado, e continuo o hash com os meus bytes (`ext`). O resultado é uma assinatura válida para `segredo || msg || padding || ext`, sem nunca ter visto o segredo. Referência: [Wikipedia: Length extension attack](https://en.wikipedia.org/wiki/Length_extension_attack).
 
-### 3. Montando o ataque
+### 4. Montando o ataque
 
 A mensagem real que o servidor assina é `SECRET_KEY (16 bytes) + "action=download&file=public/notes.txt"`. O length extension me deixa anexar:
 
@@ -125,7 +171,11 @@ Dois detalhes de implementação que me pegariam se eu não cuidasse:
 - **Encoding.** O servidor faz `token.encode("latin-1")`. Então eu tenho que mandar os bytes do padding (ex.: `0x80`) de forma que o Flask os receba como `0x80`. Decodifico os bytes forjados como `latin-1` e deixo o `urlencode` cuidar do resto.
 - **Tamanho do segredo.** O comentário diz 16. Se não dissesse, eu faria um brute force de 8 a 32 bytes, testando cada palpite contra o `/download` até um não dar 403.
 
-Implementei o SHA-256 continuável à mão pra deixar a matemática explícita (dá pra fazer com `hashpumpy` ou `hlextend`, mas aí a conta fica escondida numa lib). Script completo, idêntico ao arquivo em `scripts/`:
+Implementei o SHA-256 continuável à mão pra deixar a matemática explícita (dá pra fazer com `hashpumpy` ou `hlextend`, mas aí a conta fica escondida numa lib).
+
+### 5. Exploração
+
+O script junta tudo: descobre a base viva, pega o token público de `/files`, roda o length extension para anexar `&file=private/flag.txt`, forja a assinatura e dispara o `/download`. Completo, idêntico ao arquivo em `scripts/`:
 
 #### `scripts/script1.py`
 
