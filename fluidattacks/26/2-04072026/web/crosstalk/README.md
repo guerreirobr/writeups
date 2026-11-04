@@ -42,7 +42,29 @@ Na minha instância o host era esse. O `public.zip` usa compressão AES, então 
 
 ## Resolução
 
-### 1. O que o control plane exige
+### 1. Extração dos arquivos
+
+O `public.zip` (senha `infected`) traz o pacote `hookrelay`. `unzip` não abre o AES, então `7z`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+7z x -pinfected public.zip -osrc -y && find src/hookrelay -name '*.py'
+```
+
+```text
+src/hookrelay/control.py
+src/hookrelay/config.py
+src/hookrelay/events.py
+src/hookrelay/subscriptions.py
+src/hookrelay/audit.py
+src/hookrelay/templating.py
+...
+```
+
+Vários módulos. A cadeia desse desafio só aparece lendo como eles se conectam: o `control.py` (o que o endpoint admin exige), o `events.py` (o heartbeat e o segredo), e o par `subscriptions.py`/`audit.py` (onde o filtro é ignorado). Vou por essa ordem.
+
+### 2. O que o control plane exige
 
 #### `hookrelay/control.py`
 
@@ -65,7 +87,7 @@ HEARTBEAT_TOKEN = secrets.token_hex(24)   # 48 hex chars, aleatório
 
 Ou seja: não preciso de um JWT admin, preciso do valor exato do `HEARTBEAT_TOKEN`. A pergunta vira: onde esse segredo aparece de uma forma que um usuário comum consiga observar?
 
-### 2. O segredo viaja no evento de heartbeat
+### 3. O segredo viaja no evento de heartbeat
 
 #### `hookrelay/events.py`
 
@@ -86,7 +108,7 @@ def _heartbeat_loop():
 
 O token não fica preso no módulo de controle: ele entra no fluxo de auditoria como `actor.context.continuation_id`, uma vez por minuto. Falta ver se um usuário comum consegue fazer esse campo aparecer numa resposta dele.
 
-### 3. O broadcast ignora o filtro (o crosstalk)
+### 4. O broadcast ignora o filtro (o crosstalk)
 
 Uma assinatura comum aceita `url_template` começando com `https://` e um filtro da allowlist, que **não** inclui eventos de sistema:
 
@@ -132,7 +154,7 @@ A cadeia fecha: eu controlo a URL; a URL pode pedir `{{actor.context.continuatio
 > [!TIP]
 > **Conceito: injeção de template / crosstalk de contexto.** O `url_template` é interpolado contra o objeto do evento. Quando um evento privilegiado (com segredos) é renderizado contra um template de um usuário sem privilégio, o template funciona como uma consulta: `{{caminho.aninhado}}` extrai qualquer campo do contexto. A falha de autorização (broadcast ignora o filtro) é o que conecta o evento secreto ao template do atacante. Nenhum callback externo é necessário: o audit log é o canal de retorno.
 
-### 4. Exploração automatizada
+### 5. Exploração automatizada
 
 O exploit registra um usuário, cria a assinatura com o template de vazamento (a URL aponta para `guerreiro.invalid`, um domínio reservado, porque a entrega externa está desabilitada no sandbox e o audit log é o registro canônico), faz polling do audit log até o heartbeat aparecer, extrai o token da `rendered_url` e o usa no control plane. Script completo, idêntico ao arquivo em `scripts/`:
 
