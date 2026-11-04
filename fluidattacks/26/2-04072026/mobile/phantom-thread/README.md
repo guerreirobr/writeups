@@ -41,7 +41,46 @@ Na minha instância era esse host. Use o da sua (o script lê `TARGET`).
 
 ## Resolução
 
-### 1. Revisão do Manifest e das activities
+### 1. Extração dos arquivos
+
+O `public.zip` (senha `infected`) traz o app decompilado. `unzip` não abre o AES, então `7z`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+7z x -pinfected -osrc public.zip -y && find src -name 'AndroidManifest.xml' -o -name '*Activity.java'
+```
+
+```text
+src/.../AndroidManifest.xml
+src/.../AdminPanelActivity.java
+src/.../sdk/AnalyticsRedirectActivity.java
+```
+
+### 2. Reconhecimento: o backend modela os componentes Android
+
+O serviço remoto expõe a estrutura do app em endpoints de descrição. Mapeei o que havia:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+for e in /api/info /api/activities /api/manifest; do echo "== $e =="; curl -sk "https://$TARGET$e"; echo; done
+```
+
+```text
+== /api/info ==
+{"components":{"activities":6,"receivers":1,"services":1},"package":"com.fluidctf.messenger","min_sdk":24}
+== /api/activities ==
+{"activities":{".AdminPanelActivity":{"exported":false,"full_name":"com.fluidctf.messenger.AdminPanelActivity"}, ...}}
+== /api/manifest ==
+<manifest ...>
+    ... android:name=".AdminPanelActivity" android:exported="false"
+        android:permission="com.fluidctf.messenger.permission.ADMIN" ...
+```
+
+Confirmado: o backend reproduz o modelo de componentes do Android. A `AdminPanelActivity` aparece como `exported:false` e protegida por permissão, e existe um resolvedor de intents (`/api/intent/send`) que lança um componente como o Android faria. Ou seja, o que eu ler no código decompilado dá pra testar contra esse resolvedor.
+
+### 3. Revisão do Manifest e das activities
 
 #### `AndroidManifest.xml`
 
@@ -84,7 +123,7 @@ Aqui está o furo: a activity exportada pega um `Intent` inteiro de um extra con
 > [!TIP]
 > **Conceito: Intent Redirection (confused deputy).** Quando um componente exportado encaminha um `Intent` embutido (`getParcelableExtra`/`getIntent().getExtras()`) para `startActivity`/`startService`/`sendBroadcast`, ele age como um "deputado confuso": usa a autoridade dele a mando de outro. Isso contorna `exported=false` e permissões, porque a checagem de permissão olha quem chama (o app), não quem originou o pedido (o atacante). Referência: [Android App Security: Intent Redirection](https://developer.android.com/privacy-and-security/risks/intent-redirection).
 
-### 2. Exploração
+### 4. Exploração
 
 O desafio simula o resolvedor de intents em `POST /api/intent/send`, que recebe `{component, extras}`. Primeiro testei o acesso direto (baseline), que o resolvedor recusa por não ser exportado, e depois o redirect. Script completo, idêntico ao arquivo em `scripts/`:
 
