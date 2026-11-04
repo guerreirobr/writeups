@@ -43,7 +43,27 @@ Na minha instância era esse host. Use o da sua (o `script2.py` lê `TARGET`).
 
 ## Resolução
 
-### 1. Revisão do código: a chave está toda no APK
+### 1. Extração dos arquivos
+
+O `public.zip` (senha `infected`) já traz as classes decompiladas do app, não o APK cru. O `unzip` não abre o AES, então `7z`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+7z x -pinfected public.zip -oextracted && find extracted -name '*.java'
+```
+
+```text
+extracted/decompiled/com/fluidvault/crypto/CryptoManager.java
+extracted/decompiled/com/fluidvault/auth/BiometricAuthManager.java
+extracted/decompiled/com/fluidvault/data/VaultContentProvider.java
+extracted/decompiled/com/fluidvault/network/VaultApiClient.java
+extracted/decompiled/com/fluidvault/ui/LoginActivity.java
+```
+
+Cinco classes. Lendo cada uma, o mapa fica claro: `CryptoManager` guarda a derivação de chave (o buraco principal), `VaultApiClient` tem os endpoints da API (incluindo um admin), e as outras são UI/auth sem muito interesse. Começo pela cripto.
+
+### 2. Revisão do código: a chave está toda no APK
 
 #### `com/fluidvault/crypto/CryptoManager.java`
 
@@ -79,7 +99,7 @@ A chave do cofre é `PBKDF2(SEED + device_id, SALT, 10000, 256)`. O único valor
 
 O `getDeviceIdentifier` usa `String.hashCode()` e `Integer.toHexString()` do Java, que eu reimplemento fielmente em Python (o hashCode é `31*h + c` truncado a 32 bits com sinal).
 
-### 2. Derivando a chave e decifrando o backup
+### 3. Derivando a chave e decifrando o backup
 
 O helper `vault_decrypt.py` documenta o layout: `[12-byte IV][ciphertext][16-byte GCM tag]`. Script completo, idêntico ao arquivo em `scripts/`:
 
@@ -304,7 +324,7 @@ python3 scripts/script1.py
 
 O fallback `DEFAULT_DEVICE_ID` deu a chave certa de primeira (o GCM só decifra com a chave e o tag corretos, então a decifragem OK já confirma a chave). O cofre tem três senhas; a do "Admin Portal" é a que interessa.
 
-### 3. Usando a senha no endpoint admin
+### 4. Usando a senha no endpoint admin
 
 O `VaultApiClient.java` mostra o endpoint e o formato do corpo:
 
