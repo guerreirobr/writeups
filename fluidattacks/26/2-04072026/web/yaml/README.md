@@ -41,7 +41,31 @@ Na minha instância o host era esse. O painel marcava HTTP, mas a instância res
 
 ## Resolução
 
-### 1. Revisão do código: o loader errado
+### 1. Extração dos arquivos
+
+O `public.zip` (senha `infected`) traz o `app.py`. `unzip` não abre o AES, então `7z`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+unzip -P infected public.zip -d app
+```
+
+```text
+   skipping: app.py                  unsupported compression method 99
+```
+
+**Isso não funcionou** (pule ao replicar): zip AES. Usei o `7z`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+7z x -pinfected public.zip -oapp && sed -n '1,220p' app/app.py
+```
+
+Lendo o `app.py` aparecem duas rotas, `/health` e `/convert`, e é na `/convert` que está o bug.
+
+### 2. Revisão do código: o loader errado
 
 #### `app.py`
 
@@ -60,9 +84,37 @@ O `yaml.Loader` resolve tags como `!!python/object/apply`, `!!python/object/new`
 > [!TIP]
 > **Conceito: desserialização insegura de YAML (PyYAML).** `yaml.load` sem um loader seguro executa construtores durante o parse. A tag `!!python/object/apply:builtins.eval ["expr"]` chama `eval("expr")`. A correção é `yaml.safe_load`, que só entende tipos básicos (dict, list, str, int...). Referência: [PyYAML: loading safely](https://pyyaml.org/wiki/PyYAMLDocumentation#loading-yaml).
 
-### 2. Exploração
+### 3. Exploração
 
-O payload YAML aplica `builtins.eval` numa expressão que importa `os`, roda `cat /flag.txt` e retorna a saída. O resultado vem no campo `result` do JSON. Script completo, idêntico ao arquivo em `scripts/`:
+Minha primeira tentativa foi sobre `http://` (que o painel anunciava) e deu timeout:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+python3 scripts/script2.py
+```
+
+```text
+[*] Enviando payload para http://ab63e65a47096f46.chal.ctf.ae/convert
+[-] Erro na conexão: <urlopen error timed out>
+```
+
+**Isso não funcionou** (pule ao replicar): HTTP está morto. Confirmei com um probe nos dois esquemas no `/health`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+echo "== HTTP =="; curl -i -s --max-time 8 "http://$TARGET/health"; echo "== HTTPS =="; curl -k -i -s --max-time 8 "https://$TARGET/health"
+```
+
+```text
+== HTTP ==
+(timeout)
+== HTTPS ==
+HTTP/1.1 200 OK
+```
+
+HTTPS vivo. Ajustei o script para `https://` e segui. O payload YAML aplica `builtins.eval` numa expressão que importa `os`, roda `cat /flag.txt` e retorna a saída. O resultado vem no campo `result` do JSON. Script completo, idêntico ao arquivo em `scripts/`:
 
 #### `scripts/script2.py`
 
