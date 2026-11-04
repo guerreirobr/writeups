@@ -45,6 +45,15 @@ Na minha instância o host era esse (o script usa a constante `TARGET`).
 
 Mapeando o fluxo: `/register` cria conta e já dá US$ 100 (visto no `/balance` logo após o registro); `/transfer` move dinheiro para outro usuário (`to_user`, `amount`); `/store` lista o "Premium Account Access" por US$ 500; `/store/buy` com `item=premium_access` compra. Comprar premium sem saldo dá 400. A conta principal sozinha tem US$ 100, insuficiente.
 
+O baseline confirma o beco: registro a conta principal, ela nasce com US$ 100 e a compra do premium é recusada por saldo:
+
+```text
+[*] registrado principal, saldo inicial:
+{"balance": 100.0}
+[*] tentando comprar premium sozinho:
+{"balance": 100.0, "error": "Insufficient funds"}
+```
+
 A pergunta é: de onde vêm os outros US$ 400? Como o cadastro é livre e cada conta ganha US$ 100, eu simplesmente crio mais contas e junto o dinheiro.
 
 > [!TIP]
