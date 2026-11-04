@@ -43,7 +43,35 @@ Na minha instância o host era esse. Use o da sua (o script lê `TARGET`).
 
 ## Resolução
 
-### 1. Reconhecimento: o que o servidor expõe
+### 1. Extração dos arquivos
+
+O desafio entrega um `public.zip` (senha `infected`). O `unzip` não abriu, então usei `7z`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+unzip -P infected -o public.zip -d extracted
+```
+
+```text
+   skipping: server.py               unsupported compression method 99
+```
+
+**Isso não funcionou** (pule ao replicar): os zips dessa plataforma são AES ("method 99"), que o Info-ZIP não descompacta. Troquei pelo `7z`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+7z x -pinfected public.zip -oextracted -y && find extracted -maxdepth 4 -type f
+```
+
+```text
+extracted/server.py
+```
+
+Com o `server.py` extraído, dá para ler a geração das assinaturas antes de bater no servidor.
+
+### 2. Reconhecimento: o que o servidor expõe
 
 `/api/info` devolve a curva (NIST P-256) e a chave pública. Importante: a ordem bate com a P-256 padrão, então todos os parâmetros da curva são conhecidos.
 
@@ -62,7 +90,7 @@ curl -sk https://$TARGET/api/info | python3 -m json.tool
 }
 ```
 
-### 2. Revisão do código: o nonce é fraco
+### 3. Revisão do código: o nonce é fraco
 
 #### `server.py`
 
@@ -105,11 +133,27 @@ O servidor se recusa a *assinar* um token admin, mas *valida* qualquer assinatur
 > [!TIP]
 > **Conceito: Hidden Number Problem (nonce enviesado em ECDSA).** Numa assinatura ECDSA, `s = k^-1 (z + r*d) mod n`, logo `k = a*d + b mod n` com `a = r*s^-1` e `b = z*s^-1` conhecidos. Se `k` fosse uniforme em `[0,n)` não haveria informação, mas se `k` é sempre pequeno (aqui `< 2^248`), cada assinatura é uma equação modular com erro pequeno. Juntando várias, montamos um lattice cujo vetor curto codifica `d`. LLL acha esse vetor. Referência: [Breaking ECDSA with a biased nonce (overview)](https://en.wikipedia.org/wiki/Elliptic_Curve_Digital_Signature_Algorithm#Security).
 
-### 3. Coletando assinaturas
+### 4. Coletando assinaturas
 
-O `/api/sign` assina qualquer token `standard` à vontade (com um rate limit de 10/s, que o script contorna com pausas). Cada resposta me dá `r`, `s` e o hash `z`. Coletei 70 pra ter folga.
+O `/api/sign` assina qualquer token `standard` à vontade (com um rate limit de 10/s, que o script contorna com pausas). Cada resposta devolve o par `r`/`s` e o hash `z`, no formato que o `server.py` monta (`"signature": {"r": ..., "s": ...}, "hash": ...`). Como o HNP precisa de bem mais assinaturas do que os 8 bits vazados, coletei 70 pra ter folga. A coleta roda dentro do script (salva em `loot/signatures.json` pra reaproveitar):
 
-### 4. Primeira tentativa de lattice: não fechou
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+SAMPLES=70 python3 scripts/script2.py
+```
+
+```text
+[*] Coletando mais assinaturas até chegar em 70...
+[*] Assinatura coletada 1/70
+[*] Assinatura coletada 2/70
+...[snip]...
+[*] Assinatura coletada 70/70
+```
+
+Com as 70 assinaturas salvas, parto para o lattice.
+
+### 5. Primeira tentativa de lattice: não fechou
 
 Minha primeira versão (`scripts/script1.py`) montava o lattice sem escalar as coordenadas nem centralizar o alvo no meio do intervalo `[0, 2^248)`. Rodei o LLL varrendo de 45 a 70 assinaturas:
 
@@ -129,7 +173,7 @@ O problema é de norma: a ordem `n` tem ~256 bits e o erro (o nonce) ~248 bits. 
 1. **Escala** (`SCALE = 1<<8`): multiplico as linhas da ordem e os coeficientes por 256 pra que a diferença de 8 bits entre `n` e `k` não desequilibre a norma.
 2. **Alvo centralizado:** em vez de mirar `k ≈ 0`, miro `k ≈ 2^247` (o centro do intervalo). Assim o erro vira `k - 2^247`, menor em módulo, o que facilita o LLL.
 
-### 5. Lattice correto e recuperação da chave
+### 6. Lattice correto e recuperação da chave
 
 Script completo, idêntico ao arquivo em `scripts/`:
 
