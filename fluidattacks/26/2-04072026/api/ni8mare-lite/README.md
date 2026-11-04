@@ -43,7 +43,34 @@ Na minha instância era esse host. Use o da sua (o script usa a constante `TARGE
 
 ## Resolução
 
-### 1. Revisão do código: separando iscas do caminho real
+### 1. Extração dos arquivos
+
+O desafio entrega um `public.zip` (senha `infected`). Como nos outros, o `unzip` não abre o AES e caí no `7z`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+unzip -P infected -o public.zip -d src
+```
+
+```text
+   skipping: app.py                  unsupported compression method 99
+```
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+7z x -pinfected public.zip -osrc -y && find src -maxdepth 4 -type f
+```
+
+```text
+src/app.py
+src/Dockerfile
+```
+
+Vem o `app.py` (a aplicação Flask) e o `Dockerfile`. Esse é um desafio de leitura de código: toda a cadeia sai da análise estática do `app.py`.
+
+### 2. Revisão do código: separando iscas do caminho real
 
 O `app.py` é generoso com comentários, inclusive marcando três iscas:
 
@@ -90,11 +117,25 @@ Leitura de arquivo arbitrário sem autenticação, filtrada só pela extensão. 
 > [!TIP]
 > **Conceito: derivação de chave a partir de dado público.** Um segredo só é secreto se a chave que o protege também for. Aqui a "cifra" (XOR) usa uma chave totalmente determinada pelo horário de boot, que o próprio servidor publica. Isso é ofuscação, não criptografia: qualquer um com o ciphertext e o timestamp reconstrói a chave. Referência: [CWE-329 / CWE-330 (uso de valores previsíveis em contexto de segurança)](https://cwe.mitre.org/data/definitions/330.html).
 
-### 2. Recuperando o segredo e forjando o JWT
+### 3. Recuperando o segredo e forjando o JWT
 
 Os três passos, encadeados: `/api/health` para o timestamp, `/api/webhooks/trigger` para o config XORado, e o XOR reverso. A chave XOR é `sha256(str(BOOT_TIMESTAMP)).digest()[:48]` (o segredo tem 48 bytes ASCII, pois é hex de 24 bytes). Com o `SESSION_SECRET` em claro, o `jwt.encode` gera um token `role=admin` que o servidor aceita.
 
-### 3. Escape da sandbox do `/evaluate`
+É exatamente o que o script faz, e dá pra ver cada elo na saída real:
+
+```text
+{"started_at":1783177927,"status":"ok","uptime_seconds":318,"version":"2.1.0"}
+[*] BOOT_TIMESTAMP vazado: 1783177927
+POST /api/webhooks/trigger lendo /app/.internal/config.json
+{"file_metadata":[{"metadata":{"preview":"{\n  \"session_secret\": \"684fc7162d246b84...\""}}]}
+[*] session_secret codificado em XOR: 684fc7162d246b84f50c0d323f1812db...
+[*] SESSION_SECRET recuperado: cd787fb1da0946d2fb58ab930a62196d5aa17a00d74884ed
+{"role":"admin","user":"guerreiro","valid":true}
+```
+
+O `started_at` do health vira a chave XOR; o `preview` do webhook entrega o ciphertext; o XOR reverso devolve o `SESSION_SECRET` em claro; e o `{"valid":true,"role":"admin"}` confirma que o JWT forjado foi aceito. Faltava só usar esse acesso admin no endpoint vulnerável.
+
+### 4. Escape da sandbox do `/evaluate`
 
 O endpoint final roda `exec(expression)` com `__builtins__` reduzido e uma blocklist de regex (`import`, `os`, `open`, `eval`, `exec`, `globals`...). Dois truques derrubam isso:
 
