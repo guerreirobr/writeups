@@ -41,7 +41,28 @@ Na minha instância o host era esse (o script usa a constante `TARGET_HOST`).
 
 ## Resolução
 
-### 1. Revisão do código: o WebView vaza o token
+### 1. Extração dos arquivos
+
+O `public.zip` (senha `infected`) traz o código decompilado do app. `unzip` lista mas não extrai o AES, então `7z`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+7z x -pinfected -oextracted public.zip -y && find extracted -name '*.java' -o -name '*.xml' | grep -E 'fluidrealty|network_security|Manifest'
+```
+
+```text
+extracted/decompiled-src/AndroidManifest.xml
+extracted/decompiled-src/com/fluidrealty/app/WebViewActivity.java
+extracted/decompiled-src/com/fluidrealty/app/bridge/AndroidBridge.java
+extracted/decompiled-src/com/fluidrealty/app/auth/TokenManager.java
+extracted/decompiled-src/com/fluidrealty/app/network/ApiService.java
+extracted/decompiled-src/res/xml/network_security_config.xml
+```
+
+Lendo as classes, duas chamam atenção de imediato: a `WebViewActivity` (que configura o WebView) e a `AndroidBridge` (o bridge nativo). A `ApiService` me dá o mapa da API.
+
+### 2. Revisão do código: o WebView vaza o token
 
 #### `WebViewActivity.java`
 
@@ -67,11 +88,55 @@ Três fatos se somam: JS habilitado, um bridge nativo exposto com `getAuthToken(
 > [!TIP]
 > **Conceito: WebView JavaScript Interface leak.** `addJavascriptInterface` registra um objeto Java acessível por `window.<nome>` em qualquer JS que rodar no WebView. Se o WebView carrega conteúdo não confiável (URL externa, HTTP, conteúdo de terceiros) e o objeto expõe dados sensíveis (token, device id, arquivos), esse conteúdo rouba os dados. A regra é nunca expor segredos pelo bridge e só habilitar JS/bridge para conteúdo próprio e sob HTTPS. Referência: [Android: WebView addJavascriptInterface risks](https://developer.android.com/privacy-and-security/risks/webview-unsafe-usage).
 
-### 2. Reconhecimento: achando o simulador do WebView
+### 3. Reconhecimento: do código aos endpoints, e achar o simulador
 
-Com os scripts de enumeração (`scripts/script1.py` a `scripts/script4.py`, recon de rotas em HTTP e HTTPS reproduzindo os headers do app) mapeei a API e cheguei ao endpoint `/api/webview/simulate`, que aceita `{"javascript": "..."}` e executa o JS com o `AndroidBridge` disponível, exatamente como o WebView do app faria. Esse é o pivô: dá pra rodar JS "como o app" e falar com o bridge.
+Não precisei chutar os endpoints: a interface Retrofit `ApiService.java` lista todos:
 
-### 3. Exploração: pegar o token e bater no admin
+```java
+public interface ApiService {
+    @GET("/api/properties")        Call<...> getProperties();
+    @GET("/api/properties")        Call<...> searchProperties(@Query("city") String city);
+    @GET("/api/properties/admin")  Call<...> getAdminProperties();   // <-- alvo
+}
+```
+
+O `script1.py` bateu nesses endpoints reproduzindo os headers do app (`X-App-Version`, `X-Platform: android`). O público abre, o admin pede token:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+python3 scripts/script1.py
+```
+
+```text
+URL: https://87e6bb1481310f67.chal.ctf.ae/api/properties
+Status: 200
+  "properties": [ { "price": 820000, ... }, { "price": 1200000, ... } ]
+
+URL: https://87e6bb1481310f67.chal.ctf.ae/api/properties/admin
+Status: 401
+  "error": "Authentication required",
+  "message": "Provide a valid Bearer token"
+```
+
+Então o alvo é `/api/properties/admin` e falta um Bearer válido. O token mora no app, atrás do `AndroidBridge.getAuthToken()`, mas eu não tenho device. A saída foi enumerar mais rotas do backend (`script2.py`/`script3.py`), e aí apareceu o `/api/webview/simulate`:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+python3 scripts/script3.py
+```
+
+```text
+URL: https://87e6bb1481310f67.chal.ctf.ae/api/webview/simulate
+Status: 200
+  "webview_config": { "javascript_enabled": true, "bridge": "AndroidBridge" },
+  "usage": "POST { \"javascript\": \"<code>\" }"
+```
+
+Esse endpoint é o pivô: ele aceita `{"javascript": "..."}` e executa o JS com o `AndroidBridge` disponível, exatamente como o WebView do app faria. Ou seja, dá pra rodar JS "como o app" e falar com o bridge sem device nenhum.
+
+### 4. Exploração: pegar o token e bater no admin
 
 O exploit final roda vários snippets de JS no simulador (sendo o essencial `AndroidBridge.getAuthToken()`), coleta os tokens que aparecem nas respostas e testa cada um no `/api/properties/admin`. Script completo, idêntico ao arquivo em `scripts/`:
 
