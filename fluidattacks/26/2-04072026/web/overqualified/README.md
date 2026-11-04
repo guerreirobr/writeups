@@ -43,7 +43,38 @@ Na minha instância o host era esse (o script lê `TARGET`).
 
 ### 1. Reconhecimento: staff vs comum
 
-O portal tem registro, dashboard e uma seção "Administration / Admin Dashboard" que só aparece para staff. Sem código-fonte, a hipótese mais barata de testar num app Django é mass assignment no cadastro: o Django tem o atributo `is_staff` no model de usuário, e se a view fizer algo como `User.objects.create(**request.POST)` ou um `ModelForm` com `fields = "__all__"`, o cliente consegue setar `is_staff`.
+O alvo só responde em HTTPS (em HTTP o `/register` redireciona e o resto expira). O portal (NexaCorp People Portal) tem `/register/`, `/dashboard/` e uma seção "Administration / Admin Dashboard". Peguei o formulário de cadastro:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+curl -sk -c cookies.txt "https://$TARGET/register/" | grep -oiE 'name="[^"]+"|csrfmiddlewaretoken'
+```
+
+```text
+csrfmiddlewaretoken
+name="csrfmiddlewaretoken"
+name="username"
+name="email"
+name="password1"
+name="password2"
+```
+
+Registrei um usuário normal (`script1.py`, que trata o CSRF do Django) e confirmei o baseline: dashboard de membro comum, e a rota de admin **negada**:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+python3 scripts/script1.py
+```
+
+```text
+[*] registrado usuário comum -> dashboard de member
+[*] GET /admin/dashboard/
+[*] Status: 403
+```
+
+Então existe uma rota `/admin/dashboard/` protegida, e meu usuário comum não entra. Sem código-fonte, a hipótese mais barata num app Django é mass assignment no cadastro: o Django tem o atributo `is_staff` no model de usuário, e se a view fizer algo como `User.objects.create(**request.POST)` ou um `ModelForm` com `fields = "__all__"`, o cliente consegue setar `is_staff`.
 
 > [!TIP]
 > **Conceito: mass assignment / overposting (CWE-915).** Acontece quando o servidor vincula automaticamente os campos do request a um objeto/model sem uma allowlist. O atacante inclui campos sensíveis que não estão no formulário (`is_staff`, `is_admin`, `role`, `balance`...) e o servidor os aceita. A defesa é uma allowlist explícita de campos (`fields = ["username", "email", ...]`). Referência: [CWE-915](https://cwe.mitre.org/data/definitions/915.html).
